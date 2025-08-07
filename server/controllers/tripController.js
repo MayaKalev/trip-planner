@@ -10,9 +10,11 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 // @route   POST /api/trip/plan
 // @access  Private
 const planTrip = asyncHandler(async (req, res) => {
-  const { location, tripType } = req.body;
+  let { location, tripType } = req.body;
+
 
   console.log("📥 Received request body:", req.body);
+  console.log('🔹 Location (full):', req.body.location);
   console.log("🔹 Location type:", typeof location);
   console.log("🔹 Location content:", location);
 
