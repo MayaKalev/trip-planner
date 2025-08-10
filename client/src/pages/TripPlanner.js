@@ -12,6 +12,7 @@ const TripPlanner = () => {
   const [formData, setFormData] = useState({
     location: null, // { name, lat, lng }
     tripType: 'hiking',
+    imageUrl: ''
   });
   const [loading, setLoading] = useState(false);
   const [routeData, setRouteData] = useState(null);

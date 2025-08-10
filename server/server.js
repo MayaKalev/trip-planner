@@ -11,6 +11,8 @@ const authRoutes = require('./routes/auth');
 const routeRoutes = require('./routes/routes');
 const weatherRoutes = require('./routes/weather');
 const tripRoutes = require('./routes/trip');
+const imageRoutes = require('./routes/imageRoute');
+
 
 // Import middleware
 const { errorHandler } = require('./middleware/errorHandler');
@@ -55,6 +57,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/trip', tripRoutes);
+app.use('/api/image', imageRoutes); 
 
 // Error handling middleware
 app.use(errorHandler);
