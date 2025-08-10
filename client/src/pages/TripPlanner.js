@@ -191,7 +191,7 @@ const TripPlanner = () => {
                       onChange={(e) => setFormData({ ...formData, tripType: e.target.value })}
                       className="mr-2"
                     />
-                    <span className="text-sm">Cycling (45-75 km/day, city to city)</span>
+                    <span className="text-sm">Cycling (2-day route,max 60 km per day)</span>
                   </label>
                 </div>
               </div>
@@ -258,23 +258,6 @@ const TripPlanner = () => {
                     </div>
                   ))}
                 </div>
-
-                {stats.totalElevation && (
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-green-600">
-                        +{Math.round(stats.totalElevation.gain)}m
-                      </div>
-                      <div className="text-xs text-gray-600">Elevation Gain</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-red-600">
-                        -{Math.round(stats.totalElevation.loss)}m
-                      </div>
-                      <div className="text-xs text-gray-600">Elevation Loss</div>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}

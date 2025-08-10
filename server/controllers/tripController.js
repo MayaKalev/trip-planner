@@ -183,7 +183,6 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
     const baseBody = {
       coordinates,                           // [[lon,lat], ...]
       instructions: true,
-      elevation: true,
       extra_info: ['waytype', 'steepness', 'surface'],
       geometry_simplify: false
     };
@@ -283,20 +282,12 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
           day: 1,
           distance: day1Meters / 1000,
           duration: (totalSec * day1Frac) / 3600,
-          elevation: {
-            gain: (properties.ascent || 0) * day1Frac,
-            loss: (properties.descent || 0) * day1Frac
-          },
           points: points.filter(p => p.day === 1)
         },
         {
           day: 2,
           distance: day2Meters / 1000,
           duration: (totalSec * day2Frac) / 3600,
-          elevation: {
-            gain: (properties.ascent || 0) * day2Frac,
-            loss: (properties.descent || 0) * day2Frac
-          },
           points: points.filter(p => p.day === 2)
         }
       ]
@@ -305,7 +296,6 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
           day: 1,
           distance: totalMeters / 1000,
           duration: totalSec / 3600,
-          elevation: { gain: properties.ascent || 0, loss: properties.descent || 0 },
           points
         }
       ];
@@ -316,11 +306,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
       points,
       dailyRoutes,
       totalDistance: totalMeters / 1000,
-      totalDuration: totalSec / 3600,
-      totalElevation: {
-        gain: properties.ascent || 0,
-        loss: properties.descent || 0
-      }
+      totalDuration: totalSec / 3600
     };
 
   } catch (error) {
