@@ -172,6 +172,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
       const d = haversineMetersLonLat(start, last);
       if (d > 100) coordinates.push(start);
     }
+    
 
     console.log(' First snapped coordinate:', coordinates[0]);
 
