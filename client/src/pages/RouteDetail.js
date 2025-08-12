@@ -22,7 +22,6 @@ const RouteDetail = () => {
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
-    status: 'planned',
     notes: ''
   });
   const [saving, setSaving] = useState(false);
@@ -40,7 +39,6 @@ const RouteDetail = () => {
         setEditForm({
           name: r?.name ?? '',
           description: r?.description ?? '',
-          status: r?.status ?? 'planned',
           notes: r?.notes ?? ''
         });
       } catch (e) {
@@ -92,13 +90,6 @@ const RouteDetail = () => {
 
   const getTripTypeIcon = (tripType) => (tripType === 'hiking' ? '🥾' : '🚴');
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-blue-100 text-blue-800';
-    }
-  };
 
   if (loading) return <LoadingSpinner text="Loading route..." />;
 
@@ -223,25 +214,6 @@ const RouteDetail = () => {
                   <div className="text-sm text-gray-600">Type</div>
                 </div>
               </div>
-
-              <div className="flex items-center justify-center">
-                <span className={`badge ${getStatusColor(route.status)}`}>
-                  {editing ? (
-                    <select
-                      name="status"
-                      value={editForm.status}
-                      onChange={handleEditChange}
-                      className="bg-transparent border-0 text-inherit"
-                    >
-                      <option value="planned">Planned</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  ) : (
-                    route.status
-                  )}
-                </span>
-              </div>
             </div>
           </div>
 
@@ -322,7 +294,7 @@ const RouteDetail = () => {
                 center={route?.center ?? centerFallback}
                 showMarkers
                 showRoute
-                height="600px"
+                height="500px"
               />
             </div>
           </div>

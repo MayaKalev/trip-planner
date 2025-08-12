@@ -215,7 +215,7 @@ const RouteMap = ({
   return (
     <div
       ref={containerRef}
-      style={{ height, width: '100%', minHeight: '200px' }}
+      style={{ height, width: '100%', minHeight: '500px' }}
       className="rounded-lg overflow-hidden"
     />
   );
