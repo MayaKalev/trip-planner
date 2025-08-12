@@ -7,56 +7,64 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { ArrowLeft, MapPin, Calendar, Clock, Edit, Trash2, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+function isFiniteNumber(n) {
+  return typeof n === 'number' && Number.isFinite(n);
+}
+
 const RouteDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [route, setRoute] = useState(null);
   const [loading, setLoading] = useState(true);
+
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
-    status: '',
+    status: 'planned',
     notes: ''
   });
   const [saving, setSaving] = useState(false);
 
+  // טעינת פרטי המסלול (קריאה אחת בלבד)
   useEffect(() => {
-    fetchRoute();
-  }, [id]);
-
-  const fetchRoute = async () => {
-    try {
-      const routeData = await routeService.getRoute(id);
-      setRoute(routeData);
-      setEditForm({
-        name: routeData.name,
-        description: routeData.description || '',
-        status: routeData.status,
-        notes: routeData.notes || ''
-      });
-    } catch (error) {
-      console.error('Error fetching route:', error);
-      toast.error('Failed to load route');
-      navigate('/routes');
-    } finally {
-      setLoading(false);
-    }
-  };
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const payload = await routeService.getRoute(id, { noCache: true });
+        const r = payload?.route ?? payload; // תומך בשתי הצורות
+        if (!mounted) return;
+        setRoute(r);
+        setEditForm({
+          name: r?.name ?? '',
+          description: r?.description ?? '',
+          status: r?.status ?? 'planned',
+          notes: r?.notes ?? ''
+        });
+      } catch (e) {
+        console.error('getRoute error:', e);
+        toast.error('Failed to load route');
+        navigate('/routes');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [id, navigate]);
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    setEditForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setEditForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updatedRoute = await routeService.updateRoute(id, editForm);
-      setRoute(updatedRoute);
+      const updated = await routeService.updateRoute(id, editForm);
+      const r = updated?.route ?? updated;
+      setRoute(r);
       setEditing(false);
       toast.success('Route updated successfully');
     } catch (error) {
@@ -68,10 +76,7 @@ const RouteDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this route? This action cannot be undone.')) {
-      return;
-    }
-
+    if (!window.confirm('Are you sure you want to delete this route? This action cannot be undone.')) return;
     try {
       await routeService.deleteRoute(id);
       toast.success('Route deleted successfully');
@@ -82,47 +87,38 @@ const RouteDetail = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  const getTripTypeIcon = (tripType) => {
-    return tripType === 'hiking' ? '🥾' : '🚴';
-  };
+  const getTripTypeIcon = (tripType) => (tripType === 'hiking' ? '🥾' : '🚴');
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-blue-100 text-blue-800';
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-blue-100 text-blue-800';
     }
   };
 
-  if (loading) {
-    return <LoadingSpinner text="Loading route..." />;
-  }
+  if (loading) return <LoadingSpinner text="Loading route..." />;
 
   if (!route) {
     return (
       <div className="text-center py-16">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Route Not Found</h2>
         <p className="text-gray-600 mb-6">The route you're looking for doesn't exist or has been deleted.</p>
-        <button
-          onClick={() => navigate('/routes')}
-          className="btn btn-primary"
-        >
+        <button onClick={() => navigate('/routes')} className="btn btn-primary">
           Back to Routes
         </button>
       </div>
     );
   }
+
+  const centerFallback =
+    isFiniteNumber(route?.location?.coordinates?.lat) &&
+    isFiniteNumber(route?.location?.coordinates?.lng)
+      ? [route.location.coordinates.lat, route.location.coordinates.lng]
+      : undefined;
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -135,7 +131,7 @@ const RouteDetail = () => {
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Routes
         </button>
-        
+
         <div className="flex justify-between items-start">
           <div>
             <div className="flex items-center space-x-3 mb-2">
@@ -154,18 +150,14 @@ const RouteDetail = () => {
               </h1>
             </div>
             <p className="text-gray-600 text-lg">
-              {route.location.city}, {route.location.country}
+              {route.location?.city}, {route.location?.country}
             </p>
           </div>
-          
+
           <div className="flex space-x-2">
             {editing ? (
               <>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="btn btn-primary"
-                >
+                <button onClick={handleSave} disabled={saving} className="btn btn-primary">
                   {saving ? (
                     <div className="flex items-center">
                       <div className="spinner w-4 h-4 mr-2"></div>
@@ -178,26 +170,15 @@ const RouteDetail = () => {
                     </>
                   )}
                 </button>
-                <button
-                  onClick={() => setEditing(false)}
-                  className="btn btn-secondary"
-                >
-                  Cancel
-                </button>
+                <button onClick={() => setEditing(false)} className="btn btn-secondary">Cancel</button>
               </>
             ) : (
               <>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="btn btn-secondary"
-                >
+                <button onClick={() => setEditing(true)} className="btn btn-secondary">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </button>
-                <button
-                  onClick={handleDelete}
-                  className="btn btn-danger"
-                >
+                <button onClick={handleDelete} className="btn btn-danger">
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete
                 </button>
@@ -218,19 +199,18 @@ const RouteDetail = () => {
             <div className="card-body space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {route.totalDistance.toFixed(1)}
-                  </div>
-                  <div className="text-sm text-gray-600">Total Distance (km)</div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {route.formattedDistance ?? '—'}
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {Math.round(route.totalDuration)}
-                  </div>
-                  <div className="text-sm text-gray-600">Duration (hours)</div>
+                <div className="text-sm text-gray-600">Total Distance</div>
+
+                <div className="text-2xl font-bold text-green-600">
+                  {route.formattedDuration ?? '—'}
+                </div>
+                <div className="text-sm text-gray-600">Duration</div>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">
@@ -239,9 +219,7 @@ const RouteDetail = () => {
                   <div className="text-sm text-gray-600">Days</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {route.tripType}
-                  </div>
+                  <div className="text-2xl font-bold text-orange-600">{route.tripType}</div>
                   <div className="text-sm text-gray-600">Type</div>
                 </div>
               </div>
@@ -283,9 +261,7 @@ const RouteDetail = () => {
                   placeholder="Add a description for this route"
                 />
               ) : (
-                <p className="text-gray-700">
-                  {route.description || 'No description provided.'}
-                </p>
+                <p className="text-gray-700">{route.description || 'No description provided.'}</p>
               )}
             </div>
           </div>
@@ -306,9 +282,7 @@ const RouteDetail = () => {
                   placeholder="Add personal notes about this route"
                 />
               ) : (
-                <p className="text-gray-700">
-                  {route.notes || 'No notes added yet.'}
-                </p>
+                <p className="text-gray-700">{route.notes || 'No notes added yet.'}</p>
               )}
             </div>
           </div>
@@ -325,7 +299,7 @@ const RouteDetail = () => {
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <MapPin className="h-4 w-4" />
-                <span>Location: {route.location.city}, {route.location.country}</span>
+                <span>Location: {route.location?.city}, {route.location?.country}</span>
               </div>
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Clock className="h-4 w-4" />
@@ -344,21 +318,17 @@ const RouteDetail = () => {
             </div>
             <div className="card-body p-0">
               <RouteMap
-                routeData={route.routeData}
+                routeData={route?.routeData}
+                center={route?.center ?? centerFallback}
+                showMarkers
+                showRoute
                 height="600px"
-                showMarkers={true}
-                showRoute={true}
               />
             </div>
           </div>
 
           {/* Weather Forecast */}
-          {route.weather && (
-            <WeatherCard 
-              weather={route.weather} 
-              location={route.location}
-            />
-          )}
+          {route.weather && <WeatherCard weather={route.weather} location={route.location} />}
 
           {/* Route Image */}
           {route.image && (
@@ -381,4 +351,4 @@ const RouteDetail = () => {
   );
 };
 
-export default RouteDetail; 
+export default RouteDetail;

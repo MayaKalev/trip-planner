@@ -23,76 +23,40 @@ const routeSchema = new mongoose.Schema({
     required: [true, 'Trip type is required']
   },
   location: {
-    country: {
-      type: String,
-      required: [true, 'Country is required'],
-      trim: true
-    },
-    region: {
-      type: String,
-      trim: true
-    },
-    city: {
-      type: String,
-      required: [true, 'City is required'],
-      trim: true
-    },
+    country: { type: String, required: true, trim: true },
+    region: { type: String, trim: true },
+    city: { type: String, required: true, trim: true },
     coordinates: {
-      lat: {
-        type: Number,
-        required: [true, 'Latitude is required']
-      },
-      lng: {
-        type: Number,
-        required: [true, 'Longitude is required']
-      }
+      lat: { type: Number, required: true },
+      lng: { type: Number, required: true }
     }
   },
   routeData: {
-    // Array of route points for the entire trip
+    geometry: {
+      type: { type: String, enum: ['LineString'] },
+      coordinates: { type: [[Number]] }
+    },
+    center: { type: [Number], default: undefined },
     points: [{
       lat: Number,
       lng: Number,
-      day: Number, // Which day of the trip
-      order: Number // Order within the day
+      day: Number,
+      order: Number
     }],
-    // Daily route segments
     dailyRoutes: [{
       day: Number,
-      distance: Number, // in kilometers
-      duration: Number, // estimated duration in hours
-      elevation: {
-        gain: Number,
-        loss: Number
-      },
-      points: [{
-        lat: Number,
-        lng: Number,
-        order: Number
-      }]
+      distance: Number, // km
+      duration: Number, // hours
+      points: [{ lat: Number, lng: Number, order: Number }]
     }],
-    totalDistance: {
-      type: Number,
-      required: true
-    },
-    totalDuration: {
-      type: Number,
-      required: true
-    },
-    totalElevation: {
-      gain: Number,
-      loss: Number
-    }
+    totalDistance: { type: Number, required: true, min: 0 }, // km
+    totalDuration: { type: Number, required: true, min: 0 }, // hours
+    
   },
   weather: {
-    // Weather data for the trip start date and next 2 days
     forecast: [{
       date: Date,
-      temperature: {
-        min: Number,
-        max: Number,
-        current: Number
-      },
+      temperature: { min: Number, max: Number, current: Number },
       description: String,
       icon: String,
       humidity: Number,
@@ -100,97 +64,69 @@ const routeSchema = new mongoose.Schema({
       precipitation: Number
     }]
   },
-  image: {
-    url: String,
-    alt: String
-  },
-  status: {
-    type: String,
-    enum: ['planned', 'completed', 'cancelled'],
-    default: 'planned'
-  },
-  isPublic: {
-    type: Boolean,
-    default: false
-  },
-  tags: [{
-    type: String,
-    trim: true
-  }],
-  rating: {
-    type: Number,
-    min: 1,
-    max: 5,
-    default: null
-  },
-  notes: {
-    type: String,
-    trim: true,
-    maxlength: [1000, 'Notes cannot be more than 1000 characters']
-  }
-}, {
-  timestamps: true
-});
+  image: { url: String, alt: String },
+  tags: [{ type: String, trim: true }],
+  rating: { type: Number, min: 1, max: 5, default: null },
+  notes: { type: String, trim: true, maxlength: [1000, 'Notes cannot be more than 1000 characters'] }
+}, { timestamps: true });
 
-// Indexes for efficient querying
+// Indexes
 routeSchema.index({ user: 1, createdAt: -1 });
 routeSchema.index({ tripType: 1 });
 routeSchema.index({ 'location.country': 1, 'location.city': 1 });
-routeSchema.index({ status: 1 });
+routeSchema.index({ 'routeData.geometry': '2dsphere' });
 
-// Virtual for formatted duration
-routeSchema.virtual('formattedDuration').get(function() {
-  const hours = Math.floor(this.routeData.totalDuration);
-  const minutes = Math.round((this.routeData.totalDuration - hours) * 60);
-  return `${hours}h ${minutes}m`;
+// Virtuals
+routeSchema.virtual('formattedDistance').get(function () {
+  const km = this.routeData?.totalDistance || 0;
+  return `${km.toFixed(1)} km`;
 });
 
-// Virtual for formatted distance
-routeSchema.virtual('formattedDistance').get(function() {
-  return `${this.routeData.totalDistance.toFixed(1)} km`;
+routeSchema.virtual('formattedDuration').get(function () {
+  const h = this.routeData?.totalDuration || 0;
+  return `${Math.round(h)} h`;
 });
 
-// Method to get route summary
-routeSchema.methods.getSummary = function() {
+// Methods
+routeSchema.methods.getSummary = function () {
+  const d = this.toObject();
   return {
-    id: this._id,
-    name: this.name,
-    description: this.description,
-    tripType: this.tripType,
-    location: this.location,
-    totalDistance: this.routeData.totalDistance,
-    totalDuration: this.routeData.totalDuration,
-    formattedDuration: this.formattedDuration,
-    formattedDistance: this.formattedDistance,
-    image: this.image,
-    status: this.status,
-    createdAt: this.createdAt,
-    weather: this.weather
+    id: d._id,
+    name: d.name,
+    description: d.description,
+    tripType: d.tripType,
+    location: d.location,
+    formattedDistance: `${(d.routeData?.totalDistance || 0).toFixed(1)} km`,
+    formattedDuration: `${Math.round(d.routeData?.totalDuration || 0)} h`,
+    image: d.image,
+    createdAt: d.createdAt,
+    weather: d.weather
   };
 };
 
-// Method to get detailed route data
-routeSchema.methods.getDetailed = function() {
+routeSchema.methods.getDetailed = function () {
+  const d = this.toObject();
   return {
-    id: this._id,
-    name: this.name,
-    description: this.description,
-    tripType: this.tripType,
-    location: this.location,
-    routeData: this.routeData,
-    weather: this.weather,
-    image: this.image,
-    status: this.status,
-    tags: this.tags,
-    rating: this.rating,
-    notes: this.notes,
-    createdAt: this.createdAt,
-    updatedAt: this.updatedAt
+    id: d._id,
+    name: d.name,
+    description: d.description,
+    tripType: d.tripType,
+    location: d.location,
+    routeData: d.routeData,
+    totalDistance: d.routeData?.totalDistance || 0,
+    totalDuration: d.routeData?.totalDuration || 0,
+    formattedDistance: `${(d.routeData?.totalDistance || 0).toFixed(1)} km`,
+    formattedDuration: `${Math.round(d.routeData?.totalDuration || 0)} h`,
+    weather: d.weather,
+    image: d.image,
+    tags: d.tags,
+    notes: d.notes,
+    createdAt: d.createdAt,
+    updatedAt: d.updatedAt
   };
 };
 
-// Ensure virtuals are included when converting to JSON
 routeSchema.set('toJSON', { virtuals: true });
 routeSchema.set('toObject', { virtuals: true });
 
-module.exports = mongoose.model('Route', routeSchema); 
+module.exports = mongoose.model('Route', routeSchema);

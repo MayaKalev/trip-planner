@@ -10,16 +10,30 @@ import toast from 'react-hot-toast';
 
 const TripPlanner = () => {
   const [formData, setFormData] = useState({
-    location: null, // { name, lat, lng }
+    location: null,
     tripType: 'hiking',
-    imageUrl: ''
+    imageUrl: '',
+    name: '',
+    description: ''
   });
   const [loading, setLoading] = useState(false);
   const [routeData, setRouteData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [imageData, setImageData] = useState(null);
+  const [showSaveFields, setShowSaveFields] = useState(false);
 
   const navigate = useNavigate();
+
+  const getAutoTripName = () => {
+    if (!formData.location?.name) return `Unknown ${formData.tripType} trip`;
+  
+    const parts = formData.location.name.split(',');
+    const city = (parts[0] || '').trim();
+    const country = (parts[parts.length - 1] || '').trim();
+  
+    return `${city}, ${country} ${formData.tripType} trip`;
+  };
+  
 
   // -------- Generate Route --------
   const generateRoute = async () => {
@@ -27,41 +41,25 @@ const TripPlanner = () => {
       toast.error('Please select a location from the list');
       return;
     }
-  
-    // payload בסיסי עם נתונים נקיים
+
     const payload = {
       name: formData.location?.name || '',
       lat: Number(formData.location?.lat || 0),
       lng: Number(formData.location?.lng || 0),
     };
-  
-    console.log('Sending trip data to service:', {
-      location: payload,
-      tripType: formData.tripType,
-    });
-    console.log('Type of location:', typeof payload); // צריך להיות "object"
-  
-    // ניקוי סטייט
+
     setLoading(true);
     setRouteData(null);
     setWeatherData(null);
     setImageData(null);
-  
+
     try {
-      // שולח את האובייקט הנקי ל-tripService
-      const result = await tripService.planTrip(
-        {
-          name: formData.location?.name || '',
-          lat: Number(formData.location?.lat || 0),
-          lng: Number(formData.location?.lng || 0),
-        },
-        formData.tripType
-      );
-      
+      const result = await tripService.planTrip(payload, formData.tripType);
+
       setRouteData(result.route || null);
       setWeatherData(result.weather || null);
       setImageData(result.image || null);
-  
+
       toast.success('Route generated successfully!');
     } catch (error) {
       console.error('Route generation error:', error);
@@ -70,24 +68,25 @@ const TripPlanner = () => {
       setLoading(false);
     }
   };
-  
-  
 
-  // -------- Save Route --------
-  const saveRoute = async () => {
+  // -------- Save Route flow --------
+  const handleSaveClick = () => {
     if (!routeData) {
       toast.error('No route data to save');
       return;
     }
+    setShowSaveFields(true);
+  };
 
+  const confirmSave = async () => {
     try {
       const [cityPart, ...restParts] = (formData.location?.name || '').split(',');
       const city = cityPart?.trim() || 'Unknown';
       const country = restParts.pop()?.trim() || 'Unknown';
 
       const routeToSave = {
-        name: `${city} ${formData.tripType} trip`,
-        description: `Route in ${city}, ${country}`,
+        name: getAutoTripName(),
+        description: formData.description?.trim() || `Route in ${city}, ${country}`,
         tripType: formData.tripType,
         location: {
           country,
@@ -111,7 +110,6 @@ const TripPlanner = () => {
     }
   };
 
-  // -------- Route Stats --------
   const getRouteStats = () => {
     if (!routeData) return null;
 
@@ -150,6 +148,7 @@ const TripPlanner = () => {
               <h2 className="text-xl font-semibold text-gray-900">Trip Details</h2>
             </div>
             <div className="card-body space-y-6">
+              {/* Location */}
               <div>
                 <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
                   <MapPin className="h-4 w-4 inline mr-1" />
@@ -165,6 +164,7 @@ const TripPlanner = () => {
                 )}
               </div>
 
+              {/* Trip Type */}
               <div>
                 <label htmlFor="tripType" className="block text-sm font-medium text-gray-700 mb-2">
                   <Compass className="h-4 w-4 inline mr-1" />
@@ -191,7 +191,7 @@ const TripPlanner = () => {
                       onChange={(e) => setFormData({ ...formData, tripType: e.target.value })}
                       className="mr-2"
                     />
-                    <span className="text-sm">Cycling (2-day route,max 60 km per day)</span>
+                    <span className="text-sm">Cycling (2-day route, max 60 km/day)</span>
                   </label>
                 </div>
               </div>
@@ -212,14 +212,37 @@ const TripPlanner = () => {
                 )}
               </button>
 
-              {/* Save Button */}
-              <button
-                onClick={saveRoute}
-                disabled={!routeData}
-                className="w-full btn btn-secondary mt-4"
-              >
-                Save Route
-              </button>
+              {/* Save Flow */}
+              {!showSaveFields ? (
+                <button
+                  onClick={handleSaveClick}
+                  disabled={!routeData}
+                  className="w-full btn btn-secondary mt-4"
+                >
+                  Save Route
+                </button>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <div className="text-sm text-gray-600 mb-1">Trip Name</div>
+                    <div className="font-semibold">{getAutoTripName()}</div>
+                  </div>
+                  <textarea
+                    className="input w-full"
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Description (optional)"
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  />
+                  <button
+                    onClick={confirmSave}
+                    className="w-full btn btn-primary"
+                  >
+                    Confirm Save
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -244,7 +267,6 @@ const TripPlanner = () => {
                     <div className="text-sm text-gray-600">Duration (hours)</div>
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   {stats.dailyRoutes.map((day, index) => (
                     <div

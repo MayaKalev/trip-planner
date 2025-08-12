@@ -37,9 +37,7 @@ export const tripService = {
   
 
   async createRoute(route) {
-    const response = await api.post('/trip/save', route, {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    const response = await api.post('/routes', route);
     return response.data;
   },
 };

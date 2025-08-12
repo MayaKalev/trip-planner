@@ -1,22 +1,24 @@
 const Route = require('../models/Route');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { validationResult } = require('express-validator');
+const normalizeRouteData = require('./normalizeRouteData');
+const mongoose = require('mongoose');
 
 // @desc    Get all routes for current user
 // @route   GET /api/routes
 // @access  Private
 const getRoutes = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, tripType, status } = req.query;
+  const pageNum = Number(req.query.page || 1);
+  const limitNum = Number(req.query.limit || 10);
+  const { tripType } = req.query;
 
-  // Build filter object
   const filter = { user: req.user.id };
   if (tripType) filter.tripType = tripType;
-  if (status) filter.status = status;
 
   const routes = await Route.find(filter)
     .sort({ createdAt: -1 })
-    .limit(limit * 1)
-    .skip((page - 1) * limit)
+    .limit(limitNum)
+    .skip((pageNum - 1) * limitNum)
     .exec();
 
   const count = await Route.countDocuments(filter);
@@ -26,11 +28,11 @@ const getRoutes = asyncHandler(async (req, res) => {
     data: {
       routes: routes.map(route => route.getSummary()),
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(count / limit),
+        currentPage: pageNum,
+        totalPages: Math.ceil(count / limitNum),
         totalRoutes: count,
-        hasNextPage: page * limit < count,
-        hasPrevPage: page > 1
+        hasNextPage: pageNum * limitNum < count,
+        hasPrevPage: pageNum > 1
       }
     }
   });
@@ -41,28 +43,17 @@ const getRoutes = asyncHandler(async (req, res) => {
 // @access  Private
 const getRoute = asyncHandler(async (req, res) => {
   const route = await Route.findById(req.params.id);
+  if (!route) return res.status(404).json({ success: false, message: 'Route not found' });
+  if (route.user.toString() !== req.user.id)
+    return res.status(403).json({ success: false, message: 'Not authorized to access this route' });
 
-  if (!route) {
-    return res.status(404).json({
-      success: false,
-      message: 'Route not found'
-    });
-  }
+  const { routeData: normalizedRD, center } = normalizeRouteData(route.routeData, route.location);
 
-  // Check if route belongs to user
-  if (route.user.toString() !== req.user.id) {
-    return res.status(403).json({
-      success: false,
-      message: 'Not authorized to access this route'
-    });
-  }
+  const detailed = route.getDetailed();
+  detailed.routeData = normalizedRD;
+  detailed.center = center;
 
-  res.json({
-    success: true,
-    data: {
-      route: route.getDetailed()
-    }
-  });
+  res.json({ success: true, data: { route: detailed } });
 });
 
 // @desc    Create new route
@@ -71,10 +62,7 @@ const getRoute = asyncHandler(async (req, res) => {
 const createRoute = asyncHandler(async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      errors: errors.array()
-    });
+    return res.status(400).json({ success: false, errors: errors.array() });
   }
 
   const {
@@ -89,13 +77,15 @@ const createRoute = asyncHandler(async (req, res) => {
     notes
   } = req.body;
 
+  const { routeData: normalizedRD } = normalizeRouteData(routeData, location);
+
   const route = await Route.create({
     user: req.user.id,
     name,
     description,
     tripType,
     location,
-    routeData,
+    routeData: normalizedRD,
     weather,
     image,
     tags,
@@ -104,9 +94,7 @@ const createRoute = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    data: {
-      route: route.getDetailed()
-    },
+    data: { route: route.getDetailed() },
     message: 'Route created successfully'
   });
 });
@@ -118,18 +106,11 @@ const updateRoute = asyncHandler(async (req, res) => {
   let route = await Route.findById(req.params.id);
 
   if (!route) {
-    return res.status(404).json({
-      success: false,
-      message: 'Route not found'
-    });
+    return res.status(404).json({ success: false, message: 'Route not found' });
   }
 
-  // Check if route belongs to user
   if (route.user.toString() !== req.user.id) {
-    return res.status(403).json({
-      success: false,
-      message: 'Not authorized to update this route'
-    });
+    return res.status(403).json({ success: false, message: 'Not authorized to update this route' });
   }
 
   const {
@@ -140,32 +121,31 @@ const updateRoute = asyncHandler(async (req, res) => {
     routeData,
     weather,
     image,
-    status,
     tags,
-    rating,
     notes
   } = req.body;
 
-  // Update fields
   if (name !== undefined) route.name = name;
   if (description !== undefined) route.description = description;
   if (tripType !== undefined) route.tripType = tripType;
-  if (location !== undefined) route.location = location;
-  if (routeData !== undefined) route.routeData = routeData;
   if (weather !== undefined) route.weather = weather;
   if (image !== undefined) route.image = image;
-  if (status !== undefined) route.status = status;
   if (tags !== undefined) route.tags = tags;
-  if (rating !== undefined) route.rating = rating;
   if (notes !== undefined) route.notes = notes;
+
+  const nextLocation = location !== undefined ? location : route.location;
+  if (location !== undefined) route.location = location;
+
+  if (routeData !== undefined) {
+    const { routeData: normalizedRD } = normalizeRouteData(routeData, nextLocation);
+    route.routeData = normalizedRD;
+  }
 
   const updatedRoute = await route.save();
 
   res.json({
     success: true,
-    data: {
-      route: updatedRoute.getDetailed()
-    },
+    data: { route: updatedRoute.getDetailed() },
     message: 'Route updated successfully'
   });
 });
@@ -174,29 +154,19 @@ const updateRoute = asyncHandler(async (req, res) => {
 // @route   DELETE /api/routes/:id
 // @access  Private
 const deleteRoute = asyncHandler(async (req, res) => {
-  const route = await Route.findById(req.params.id);
+  const { id } = req.params;
 
-  if (!route) {
-    return res.status(404).json({
-      success: false,
-      message: 'Route not found'
-    });
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, message: 'Invalid route id' });
   }
 
-  // Check if route belongs to user
-  if (route.user.toString() !== req.user.id) {
-    return res.status(403).json({
-      success: false,
-      message: 'Not authorized to delete this route'
-    });
+  const deleted = await Route.findOneAndDelete({ _id: id, user: req.user.id });
+
+  if (!deleted) {
+    return res.status(404).json({ success: false, message: 'Route not found' });
   }
 
-  await route.remove();
-
-  res.json({
-    success: true,
-    message: 'Route deleted successfully'
-  });
+  return res.json({ success: true, message: 'Route deleted successfully' });
 });
 
 // @desc    Get route statistics
@@ -204,46 +174,38 @@ const deleteRoute = asyncHandler(async (req, res) => {
 // @access  Private
 const getRouteStats = asyncHandler(async (req, res) => {
   const stats = await Route.aggregate([
-    { $match: { user: req.user._id } },
+    { $match: { user: new mongoose.Types.ObjectId(req.user.id) } },
     {
       $group: {
         _id: null,
         totalRoutes: { $sum: 1 },
-        totalDistance: { $sum: '$routeData.totalDistance' },
-        totalDuration: { $sum: '$routeData.totalDuration' },
-        hikingRoutes: {
-          $sum: { $cond: [{ $eq: ['$tripType', 'hiking'] }, 1, 0] }
-        },
-        cyclingRoutes: {
-          $sum: { $cond: [{ $eq: ['$tripType', 'cycling'] }, 1, 0] }
-        },
-        completedRoutes: {
-          $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
-        },
-        plannedRoutes: {
-          $sum: { $cond: [{ $eq: ['$status', 'planned'] }, 1, 0] }
-        }
+        totalDistance: { $sum: { $ifNull: ['$routeData.totalDistance', 0] } },
+        totalDuration: { $sum: { $ifNull: ['$routeData.totalDuration', 0] } },
+        hikingRoutes: { $sum: { $cond: [{ $eq: ['$tripType', 'hiking'] }, 1, 0] } },
+        cyclingRoutes: { $sum: { $cond: [{ $eq: ['$tripType', 'cycling'] }, 1, 0] } }
       }
     }
   ]);
 
-  const result = stats[0] || {
+  const base = stats[0] || {
     totalRoutes: 0,
     totalDistance: 0,
     totalDuration: 0,
     hikingRoutes: 0,
-    cyclingRoutes: 0,
-    completedRoutes: 0,
-    plannedRoutes: 0
+    cyclingRoutes: 0
   };
 
   res.json({
     success: true,
     data: {
       stats: {
-        ...result,
-        averageDistance: result.totalRoutes > 0 ? result.totalDistance / result.totalRoutes : 0,
-        averageDuration: result.totalRoutes > 0 ? result.totalDuration / result.totalRoutes : 0
+        totalRoutes: base.totalRoutes,
+        hikingRoutes: base.hikingRoutes,
+        cyclingRoutes: base.cyclingRoutes,
+        totalDistance: base.totalDistance,
+        totalDuration: base.totalDuration,
+        averageDistance: base.totalRoutes > 0 ? base.totalDistance / base.totalRoutes : 0,
+        averageDuration: base.totalRoutes > 0 ? base.totalDuration / base.totalRoutes : 0
       }
     }
   });
@@ -256,4 +218,4 @@ module.exports = {
   updateRoute,
   deleteRoute,
   getRouteStats
-}; 
+};

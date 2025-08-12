@@ -80,14 +80,6 @@ const updateRouteValidation = [
     .optional()
     .isIn(['hiking', 'cycling'])
     .withMessage('Trip type must be either hiking or cycling'),
-  body('status')
-    .optional()
-    .isIn(['planned', 'completed', 'cancelled'])
-    .withMessage('Status must be planned, completed, or cancelled'),
-  body('rating')
-    .optional()
-    .isFloat({ min: 1, max: 5 })
-    .withMessage('Rating must be between 1 and 5'),
   body('tags')
     .optional()
     .isArray()
@@ -106,7 +98,6 @@ const updateRouteValidation = [
 
 // Routes
 router.get('/', getRoutes);
-router.get('/stats', getRouteStats);
 router.get('/:id', getRoute);
 router.post('/', createRouteValidation, createRoute);
 router.put('/:id', updateRouteValidation, updateRoute);

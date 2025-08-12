@@ -4,17 +4,15 @@ import { routeService } from '../services/routeService';
 import RouteMap from '../components/RouteMap';
 import WeatherCard from '../components/WeatherCard';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { MapPin, Calendar, Clock, Trash2, Eye, Filter, Plus } from 'lucide-react';
+import { MapPin, Calendar, Eye, Filter, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const SavedRoutes = () => {
   const [routes, setRoutes] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState({
-    tripType: '',
-    status: ''
-  });
+  const [selectLoading, setSelectLoading] = useState(false);
+  const [filter, setFilter] = useState({ tripType: '' }); // ⬅️ בלי status
 
   useEffect(() => {
     fetchRoutes();
@@ -22,7 +20,7 @@ const SavedRoutes = () => {
 
   const fetchRoutes = async () => {
     try {
-      const response = await routeService.getRoutes();
+      const response = await routeService.getRoutes({}, { noCache: true }); // summaries
       setRoutes(response.routes);
     } catch (error) {
       console.error('Error fetching routes:', error);
@@ -32,56 +30,46 @@ const SavedRoutes = () => {
     }
   };
 
-  const handleDeleteRoute = async (routeId) => {
-    if (!window.confirm('Are you sure you want to delete this route?')) {
-      return;
+  // בחירת מסלול → שליפת פרטים מלאים מהשרת
+  const handleSelectRoute = async (routeSummary) => {
+    try {
+      setSelectLoading(true);
+      const id = routeSummary.id ?? routeSummary._id;
+      const payload = await routeService.getRoute(id, { noCache: true });
+      const full = payload.route ?? payload; // גמיש לשתי הצורות
+      setSelectedRoute(full); // כולל routeData + center
+    } catch (e) {
+      console.error('getRoute error:', e);
+      toast.error('Failed to load route details');
+    } finally {
+      setSelectLoading(false);
     }
+  };
 
+  const handleDeleteRoute = async (routeId) => {
+    if (!window.confirm('Are you sure you want to delete this route?')) return;
     try {
       await routeService.deleteRoute(routeId);
-      setRoutes(routes.filter(route => route.id !== routeId));
-      if (selectedRoute?.id === routeId) {
-        setSelectedRoute(null);
-      }
+      setRoutes(prev => prev.filter(r => (r.id ?? r._id) !== routeId));
+      if ((selectedRoute?.id ?? selectedRoute?._id) === routeId) setSelectedRoute(null);
       toast.success('Route deleted successfully');
     } catch (error) {
       console.error('Error deleting route:', error);
-      toast.error('Failed to delete route');
+      toast.error(error?.response?.data?.message || 'Failed to delete route');
     }
   };
 
   const filteredRoutes = routes.filter(route => {
     if (filter.tripType && route.tripType !== filter.tripType) return false;
-    if (filter.status && route.status !== filter.status) return false;
     return true;
   });
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  const formatDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
-  const getTripTypeIcon = (tripType) => {
-    return tripType === 'hiking' ? '🥾' : '🚴';
-  };
+  const getTripTypeIcon = (tripType) => (tripType === 'hiking' ? '🥾' : '🚴');
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-blue-100 text-blue-800';
-    }
-  };
-
-  if (loading) {
-    return <LoadingSpinner text="Loading your routes..." />;
-  }
+  if (loading) return <LoadingSpinner text="Loading your routes..." />;
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -90,14 +78,9 @@ const SavedRoutes = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">My Routes</h1>
-            <p className="text-gray-600">
-              View and manage your saved trip routes
-            </p>
+            <p className="text-gray-600">View and manage your saved trip routes</p>
           </div>
-          <Link
-            to="/plan"
-            className="btn btn-primary"
-          >
+          <Link to="/plan" className="btn btn-primary">
             <Plus className="h-4 w-4 mr-2" />
             Plan New Trip
           </Link>
@@ -117,9 +100,7 @@ const SavedRoutes = () => {
             </div>
             <div className="card-body space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Trip Type
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Trip Type</label>
                 <select
                   value={filter.tripType}
                   onChange={(e) => setFilter(prev => ({ ...prev, tripType: e.target.value }))}
@@ -128,21 +109,6 @@ const SavedRoutes = () => {
                   <option value="">All Types</option>
                   <option value="hiking">Hiking</option>
                   <option value="cycling">Cycling</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  value={filter.status}
-                  onChange={(e) => setFilter(prev => ({ ...prev, status: e.target.value }))}
-                  className="input"
-                >
-                  <option value="">All Status</option>
-                  <option value="planned">Planned</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
             </div>
@@ -156,28 +122,21 @@ const SavedRoutes = () => {
                   <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No routes found</h3>
                   <p className="text-gray-600 mb-4">
-                    {routes.length === 0 
-                      ? "You haven't saved any routes yet."
-                      : "No routes match your current filters."
-                    }
+                    {routes.length === 0 ? "You haven't saved any routes yet." : "No routes match your current filters."}
                   </p>
-                  {routes.length === 0 && (
-                    <Link to="/plan" className="btn btn-primary">
-                      Plan Your First Trip
-                    </Link>
-                  )}
+                  {routes.length === 0 && <Link to="/plan" className="btn btn-primary">Plan Your First Trip</Link>}
                 </div>
               </div>
             ) : (
               filteredRoutes.map(route => (
                 <div
-                  key={route.id}
+                  key={route.id ?? route._id}
                   className={`card cursor-pointer transition-all ${
-                    selectedRoute?.id === route.id
+                    (selectedRoute?.id ?? selectedRoute?._id) === (route.id ?? route._id)
                       ? 'ring-2 ring-blue-500 bg-blue-50'
                       : 'hover:shadow-md'
                   }`}
-                  onClick={() => setSelectedRoute(route)}
+                  onClick={() => handleSelectRoute(route)}
                 >
                   <div className="card-body">
                     <div className="flex items-start justify-between mb-3">
@@ -186,24 +145,19 @@ const SavedRoutes = () => {
                         <h3 className="font-semibold text-gray-900">{route.name}</h3>
                       </div>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteRoute(route.id);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteRoute(route.id ?? route._id); }}
                         className="text-red-500 hover:text-red-700 p-1"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
 
-                    {route.description && (
-                      <p className="text-gray-600 text-sm mb-3">{route.description}</p>
-                    )}
+                    {route.description && <p className="text-gray-600 text-sm mb-3">{route.description}</p>}
 
                     <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
                       <div className="flex items-center">
                         <MapPin className="h-3 w-3 mr-1" />
-                        {route.location.city}, {route.location.country}
+                        {route.location?.city}, {route.location?.country}
                       </div>
                       <div className="flex items-center">
                         <Calendar className="h-3 w-3 mr-1" />
@@ -213,16 +167,9 @@ const SavedRoutes = () => {
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4 text-sm">
-                        <span className="text-blue-600 font-medium">
-                          {route.formattedDistance}
-                        </span>
-                        <span className="text-green-600 font-medium">
-                          {route.formattedDuration}
-                        </span>
+                        <span className="text-blue-600 font-medium">{route.formattedDistance}</span>
+                        <span className="text-green-600 font-medium">{route.formattedDuration}</span>
                       </div>
-                      <span className={`badge ${getStatusColor(route.status)}`}>
-                        {route.status}
-                      </span>
                     </div>
                   </div>
                 </div>
@@ -233,6 +180,12 @@ const SavedRoutes = () => {
 
         {/* Route Details */}
         <div className="lg:col-span-2">
+          {selectLoading && (
+            <div className="card mb-4">
+              <div className="card-body">Loading route…</div>
+            </div>
+          )}
+
           {selectedRoute ? (
             <div className="space-y-6">
               {/* Route Header */}
@@ -242,34 +195,28 @@ const SavedRoutes = () => {
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">{selectedRoute.name}</h2>
                       <p className="text-gray-600 mt-1">
-                        {selectedRoute.location.city}, {selectedRoute.location.country}
+                        {selectedRoute.location?.city}, {selectedRoute.location?.country}
                       </p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <span className="text-2xl">{getTripTypeIcon(selectedRoute.tripType)}</span>
-                      <span className={`badge ${getStatusColor(selectedRoute.status)}`}>
-                        {selectedRoute.status}
-                      </span>
                     </div>
                   </div>
                 </div>
                 <div className="card-body">
-                  {selectedRoute.description && (
-                    <p className="text-gray-700 mb-4">{selectedRoute.description}</p>
-                  )}
-                  
+                  {selectedRoute.description && <p className="text-gray-700 mb-4">{selectedRoute.description}</p>}
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-600">
-                        {selectedRoute.totalDistance.toFixed(1)}
+                        {selectedRoute.formattedDistance ?? '—'}
                       </div>
-                      <div className="text-sm text-gray-600">Distance (km)</div>
-                    </div>
-                    <div className="text-center">
+                      <div className="text-sm text-gray-600">Distance</div>
+
                       <div className="text-2xl font-bold text-green-600">
-                        {Math.round(selectedRoute.totalDuration)}
+                        {selectedRoute.formattedDuration ?? '—'}
                       </div>
-                      <div className="text-sm text-gray-600">Duration (h)</div>
+                      <div className="text-sm text-gray-600">Duration</div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-purple-600">
@@ -295,19 +242,23 @@ const SavedRoutes = () => {
                 <div className="card-body p-0">
                   <RouteMap
                     routeData={selectedRoute.routeData}
+                    center={
+                      selectedRoute.center ??
+                      (Number.isFinite(selectedRoute?.location?.coordinates?.lat) &&
+                       Number.isFinite(selectedRoute?.location?.coordinates?.lng)
+                        ? [selectedRoute.location.coordinates.lat, selectedRoute.location.coordinates.lng]
+                        : undefined)
+                    }
                     height="400px"
-                    showMarkers={true}
-                    showRoute={true}
+                    showMarkers
+                    showRoute
                   />
                 </div>
               </div>
 
               {/* Weather Forecast */}
               {selectedRoute.weather && (
-                <WeatherCard 
-                  weather={selectedRoute.weather} 
-                  location={selectedRoute.location}
-                />
+                <WeatherCard weather={selectedRoute.weather} location={selectedRoute.location} />
               )}
 
               {/* Route Image */}
@@ -343,4 +294,4 @@ const SavedRoutes = () => {
   );
 };
 
-export default SavedRoutes; 
+export default SavedRoutes;
