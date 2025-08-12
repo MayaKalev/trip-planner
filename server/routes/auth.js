@@ -46,15 +46,8 @@ const updateProfileValidation = [
     .optional()
     .isEmail()
     .normalizeEmail()
-    .withMessage('Please enter a valid email'),
-  body('preferences.defaultTripType')
-    .optional()
-    .isIn(['hiking', 'cycling'])
-    .withMessage('Trip type must be either hiking or cycling'),
-  body('preferences.units')
-    .optional()
-    .isIn(['metric', 'imperial'])
-    .withMessage('Units must be either metric or imperial')
+    .withMessage('Please enter a valid email')
+  // preferences הוסר לחלוטין
 ];
 
 const changePasswordValidation = [
@@ -73,4 +66,4 @@ router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfileValidation, updateProfile);
 router.put('/password', protect, changePasswordValidation, changePassword);
 
-module.exports = router; 
+module.exports = router;

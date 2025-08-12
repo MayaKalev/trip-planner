@@ -128,7 +128,6 @@ const generateRoute = async (location, tripType) => {
   throw new Error("AI failed to generate realistic waypoints after multiple attempts.");
 };
 
-
 const snapWaypoints = async (waypoints, tripType) => {
   const profile = tripType === 'cycling' ? 'cycling-regular' : 'foot-hiking';
   const locs = waypoints.map(wp => [wp.lng, wp.lat]); // [[lon,lat]]
@@ -186,6 +185,7 @@ function cumulativeMeters(coords) {
   }
   return cum;
 }
+
 function pickMidIndexByRadius(locs, start, targetMeters) {
   let bestIdx = 1, bestDiff = Infinity;
   for (let i = 1; i < locs.length; i++) {
@@ -424,8 +424,6 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
   }
 };
 
-
-
 const generateRouteWithAI = async (location, tripType, isRetry = false) => {
   const maxRetries = 3;
   const retryDelay = 1000; // 1 second
@@ -586,37 +584,6 @@ const isWaypointsValid = (waypoints) => {
   return isNotStraight;
 };
 
-
-const isStraightLine = (points) => {
-  if (points.length < 3) return false;
-
-  let straightAngles = 0;
-  let totalAngles = 0;
-
-  for (let i = 1; i < points.length - 1; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const next = points[i + 1];
-
-    const v1 = { x: curr.lat - prev.lat, y: curr.lng - prev.lng };
-    const v2 = { x: next.lat - curr.lat, y: next.lng - curr.lng };
-
-    const len1 = Math.sqrt(v1.x ** 2 + v1.y ** 2);
-    const len2 = Math.sqrt(v2.x ** 2 + v2.y ** 2);
-
-    if (len1 === 0 || len2 === 0) continue;
-
-    const dot = v1.x * v2.x + v1.y * v2.y;
-    const cosTheta = dot / (len1 * len2);
-
-    const angle = Math.acos(Math.max(-1, Math.min(1, cosTheta))) * (180 / Math.PI);
-
-    totalAngles++;
-    if (angle > 170) straightAngles++;
-  }
-
-  return totalAngles > 0 && straightAngles / totalAngles > 0.7;
-};
 
 module.exports = {
   planTrip

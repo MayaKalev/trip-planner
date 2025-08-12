@@ -23,23 +23,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Password is required'],
     minlength: [6, 'Password must be at least 6 characters'],
-    select: false // Don't include password in queries by default
+    select: false
   },
   avatar: {
     type: String,
     default: null
-  },
-  preferences: {
-    defaultTripType: {
-      type: String,
-      enum: ['hiking', 'cycling'],
-      default: 'hiking'
-    },
-    units: {
-      type: String,
-      enum: ['metric', 'imperial'],
-      default: 'metric'
-    }
   },
   isActive: {
     type: Boolean,
@@ -53,39 +41,32 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for email queries
 userSchema.index({ email: 1 });
 
-// Pre-save middleware to hash password
+// hash password if changed
 userSchema.pre('save', async function(next) {
-  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
-
   try {
-    // Hash password with cost of 12
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
     next();
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 });
 
-// Instance method to check password
 userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
-// Instance method to get public profile (without password)
 userSchema.methods.getPublicProfile = function() {
-  const userObject = this.toObject();
-  delete userObject.password;
-  return userObject;
+  const obj = this.toObject();
+  delete obj.password;
+  return obj;
 };
 
-// Static method to find user by email
 userSchema.statics.findByEmail = function(email) {
   return this.findOne({ email: email.toLowerCase() });
 };
 
-module.exports = mongoose.model('User', userSchema); 
+module.exports = mongoose.model('User', userSchema);
