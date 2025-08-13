@@ -116,7 +116,6 @@ const TripPlanner = () => {
     return {
       totalDistance: routeData.totalDistance,
       totalDuration: routeData.totalDuration,
-      totalElevation: routeData.totalElevation,
       dailyRoutes: routeData.dailyRoutes,
     };
   };

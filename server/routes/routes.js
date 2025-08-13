@@ -6,8 +6,7 @@ const {
   getRoute,
   createRoute,
   updateRoute,
-  deleteRoute,
-  getRouteStats
+  deleteRoute
 } = require('../controllers/routeController');
 
 const router = express.Router();

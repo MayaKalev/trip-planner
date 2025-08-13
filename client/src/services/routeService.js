@@ -72,15 +72,7 @@ export const routeService = {
   async deleteRoute(id) {
     const res = await api.delete(`/routes/${id}`);
     return res.data; // { success, message }
-  },
+  }
 
-  /**
-   * Get aggregated stats
-   * Returns: stats object
-   */
-  async getRouteStats({ noCache = true } = {}) {
-    const cfg = noCache ? withNoCache() : undefined;
-    const res = await api.get('/routes/stats', cfg);
-    return res.data.data.stats;
-  },
+ 
 };

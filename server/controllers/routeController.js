@@ -169,47 +169,7 @@ const deleteRoute = asyncHandler(async (req, res) => {
   return res.json({ success: true, message: 'Route deleted successfully' });
 });
 
-// @desc    Get route statistics
-// @route   GET /api/routes/stats
-// @access  Private
-const getRouteStats = asyncHandler(async (req, res) => {
-  const stats = await Route.aggregate([
-    { $match: { user: new mongoose.Types.ObjectId(req.user.id) } },
-    {
-      $group: {
-        _id: null,
-        totalRoutes: { $sum: 1 },
-        totalDistance: { $sum: { $ifNull: ['$routeData.totalDistance', 0] } },
-        totalDuration: { $sum: { $ifNull: ['$routeData.totalDuration', 0] } },
-        hikingRoutes: { $sum: { $cond: [{ $eq: ['$tripType', 'hiking'] }, 1, 0] } },
-        cyclingRoutes: { $sum: { $cond: [{ $eq: ['$tripType', 'cycling'] }, 1, 0] } }
-      }
-    }
-  ]);
 
-  const base = stats[0] || {
-    totalRoutes: 0,
-    totalDistance: 0,
-    totalDuration: 0,
-    hikingRoutes: 0,
-    cyclingRoutes: 0
-  };
-
-  res.json({
-    success: true,
-    data: {
-      stats: {
-        totalRoutes: base.totalRoutes,
-        hikingRoutes: base.hikingRoutes,
-        cyclingRoutes: base.cyclingRoutes,
-        totalDistance: base.totalDistance,
-        totalDuration: base.totalDuration,
-        averageDistance: base.totalRoutes > 0 ? base.totalDistance / base.totalRoutes : 0,
-        averageDuration: base.totalRoutes > 0 ? base.totalDuration / base.totalRoutes : 0
-      }
-    }
-  });
-});
 
 module.exports = {
   getRoutes,
@@ -217,5 +177,5 @@ module.exports = {
   createRoute,
   updateRoute,
   deleteRoute,
-  getRouteStats
+ 
 };
