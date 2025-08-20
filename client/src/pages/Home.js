@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const Home = () => {
+  // Use AuthContext to know if a user is logged in and adjust the CTAs accordingly.
+  // Decision: do not keep local state; read directly from Context to avoid duplication.
   const { user } = useAuth();
 
   return (

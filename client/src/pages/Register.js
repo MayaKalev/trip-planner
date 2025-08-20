@@ -5,25 +5,21 @@ import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Register = () => {
-  // שמירת נתוני הטופס כולו באובייקט אחד – קל יותר להעביר ל־API
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
-  // שליטה על הצגת/הסתרת שדות סיסמה
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  // מצב טעינה – נועל כפתור ומציג Spinner בזמן שליחה
   const [loading, setLoading] = useState(false);
-  // שמירת שגיאות ולידציה ברמת כל שדה
   const [errors, setErrors] = useState({});
 
-  const { register } = useAuth(); // פונקציית ההרשמה מתוך הקונטקסט – הלוגיקה העסקית נשארת מחוץ לקומפוננטה
+  const { register } = useAuth(); 
   const navigate = useNavigate();
 
-  // שינוי ערך בטופס + ניקוי הודעת שגיאה לשדה שנערך
+  // Update form fields by input name and clear field-level errors on change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -38,7 +34,7 @@ const Register = () => {
     }
   };
 
-  // ולידציה בצד לקוח לפני שליחת הנתונים לשרת
+  // Basic client-side validation for the registration form
   const validateForm = () => {
     const newErrors = {};
 
@@ -67,26 +63,25 @@ const Register = () => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0; // מחזיר true אם אין שגיאות
+    return Object.keys(newErrors).length === 0; // returns true if no errors
   };
 
-  // שליחת הטופס לשרת
+  // Submit the form to the server
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // עצירה אם ולידציה נכשלה
+    // If validation fails, stop here
     if (!validateForm()) {
       return;
     }
 
     setLoading(true);
     try {
-      // קריאה לפונקציית ההרשמה מהקונטקסט
       const result = await register(formData.name, formData.email, formData.password);
 
       if (result.success) {
         toast.success('Registration successful! Welcome to Trip Planner!');
-        navigate('/plan'); // החלטת UX: מעבר ישירות למסך תכנון טיול
+        navigate('/plan'); 
       } else {
         toast.error(result.error);
       }
@@ -111,7 +106,7 @@ const Register = () => {
 
         <div className="card">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* שדה שם מלא */}
+            {/* Full name field */}
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                 Full Name
@@ -137,7 +132,7 @@ const Register = () => {
               )}
             </div>
 
-            {/* שדה אימייל */}
+            {/* Email field */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
@@ -163,7 +158,7 @@ const Register = () => {
               )}
             </div>
 
-            {/* שדה סיסמה */}
+            {/* Password field */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
@@ -175,7 +170,7 @@ const Register = () => {
                 <input
                   id="password"
                   name="password"
-                  type={showPassword ? 'text' : 'password'} // מאפשר הצגת סיסמה
+                  type={showPassword ? 'text' : 'password'} // allow showing password
                   autoComplete="new-password"
                   required
                   value={formData.password}
@@ -183,7 +178,7 @@ const Register = () => {
                   className={`input pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
                   placeholder="Create a password"
                 />
-                {/* כפתור הצגת/הסתרת סיסמה */}
+                {/* Toggle show/hide password */}
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
@@ -201,7 +196,7 @@ const Register = () => {
               )}
             </div>
 
-            {/* שדה אישור סיסמה */}
+            {/* Confirm password field */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
                 Confirm Password
@@ -213,7 +208,7 @@ const Register = () => {
                 <input
                   id="confirmPassword"
                   name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'} // גם כאן אפשרות הצגה
+                  type={showConfirmPassword ? 'text' : 'password'} // allow showing confirm password
                   autoComplete="new-password"
                   required
                   value={formData.confirmPassword}
@@ -221,7 +216,7 @@ const Register = () => {
                   className={`input pl-10 pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
                   placeholder="Confirm your password"
                 />
-                {/* כפתור הצגת/הסתרת אישור סיסמה */}
+                {/* Toggle show/hide confirm password */}
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
@@ -239,7 +234,7 @@ const Register = () => {
               )}
             </div>
 
-            {/* כפתור שליחה */}
+            {/* Submit button */}
             <div>
               <button
                 type="submit"
@@ -258,7 +253,7 @@ const Register = () => {
             </div>
           </form>
 
-          {/* קישור למסך התחברות */}
+          {/* Link to the login screen */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}

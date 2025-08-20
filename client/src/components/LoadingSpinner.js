@@ -1,12 +1,12 @@
 import React from 'react';
 
 /**
- * קומפוננטה להצגת Spinner של טעינה.
- * מאפשרת לקבוע גודל (`sm`, `md`, `lg`, `xl`) וטקסט מותאם אישי.
- * מיועדת להצגה בזמן שהמערכת טוענת נתונים (כמו Auth או תחזית).
+ * Component for displaying a loading spinner.
+ * Allows setting a size (`sm`, `md`, `lg`, `xl`) and custom text.
+ * Intended to be shown while the app is loading data (for example, auth or forecast).
  */
 const LoadingSpinner = ({ size = 'md', text = 'Loading...' }) => {
-  // מיפוי בין שמות גודל למחלקות Tailwind
+  // Mapping between size names and Tailwind classes
   const sizeClasses = {
     sm: 'w-4 h-4',
     md: 'w-8 h-8',
@@ -16,10 +16,7 @@ const LoadingSpinner = ({ size = 'md', text = 'Loading...' }) => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[200px]">
-      {/* עיגול מסתובב (spinner) בגודל נבחר */}
       <div className={`spinner ${sizeClasses[size]}`}></div>
-
-      {/* טקסט מתחת לספינר – אם הוגדר */}
       {text && (
         <p className="mt-4 text-gray-600 text-sm">{text}</p>
       )}

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// תיקון בעיית הצגת אייקוני ברירת מחדל ב-Leaflet בדפדפנים – טוען ישירות מ-CDN
+// Fix default Leaflet marker icons in some browsers — load directly from a CDN
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -11,8 +11,8 @@ L.Icon.Default.mergeOptions({
 });
 
 /**
- * צבעים ייחודיים לשני ימים בלבד (יום 1 – כחול, יום 2 – אדום)
- * בהתאם לדרישה שלא להציג יותר משני ימים במפה.
+ * Unique colors for exactly two days only (Day 1 – blue, Day 2 – red),
+ * per the requirement to show no more than two days on the map.
  */
 const COLORS = ['#3B82F6', '#EF4444'];
 
@@ -24,26 +24,24 @@ const RouteMap = ({
   showMarkers = true,
   showRoute = true
 }) => {
-  const containerRef = useRef(null); // רפרנס לאלמנט ה־DOM של המפה
-  const mapRef = useRef(null);       // שמירת מופע המפה ל־Leaflet
-  const overlayRef = useRef(null);   // שכבת שכבות (markers, polylines)
+  const containerRef = useRef(null); // Reference to the map's DOM container
+  const mapRef = useRef(null);       // Holds the Leaflet map instance
+  const overlayRef = useRef(null);   // Layer group for overlays (markers, polylines)
 
-  // חילוץ קואורדינטות המרכז רק אם center הוא מערך תקין
   const centerLat = Array.isArray(center) ? center[0] : undefined;
   const centerLng = Array.isArray(center) ? center[1] : undefined;
 
-  // אתחול המפה – קורה רק פעם אחת עם טעינת הקומפוננטה
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: [0, 0], // התחלה ב־zoom מינימלי, נשנה אחר כך
+      center: [0, 0],
       zoom: 1,
       zoomControl: true,
       scrollWheelZoom: true,
     });
 
-    // טעינת אריחי המפה מ־OpenStreetMap
+    // Load map tiles from OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18
@@ -51,16 +49,16 @@ const RouteMap = ({
 
     mapRef.current = map;
 
-    // תיקון באג ידוע של Leaflet שמצריך invalidateSize אחרי רינדור
+    // Workaround for a known Leaflet quirk: call invalidateSize after render
     setTimeout(() => map.invalidateSize(), 0);
 
-    // האזנה לשינוי גודל הקונטיינר כדי להתאים את המפה אוטומטית
+    // Observe container size changes and auto-adjust the map
     const ro = new ResizeObserver(() => {
       if (mapRef.current) mapRef.current.invalidateSize();
     });
     ro.observe(containerRef.current);
 
-    // ניקוי משאבים בעת פירוק הקומפוננטה
+    // Cleanup on unmount
     return () => {
       ro.disconnect();
       if (mapRef.current) {
@@ -71,7 +69,7 @@ const RouteMap = ({
     };
   }, []);
 
-  // שינוי גובה המפה בצורה דינמית לפי prop height
+  // Dynamically update the map height based on the `height` prop
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -81,7 +79,7 @@ const RouteMap = ({
     }
   }, [height]);
 
-  // עדכון מרכז המפה ו־zoom כש-props משתנים
+  // Update map center and zoom when props change
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -91,18 +89,18 @@ const RouteMap = ({
     }
   }, [centerLat, centerLng, zoom]);
 
-  // ציור מסלול ונקודות במפה
+  // Draw route and points on the map
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // הסרת שכבה קודמת במידה וקיימת
+    // Remove previous overlay layer if it exists
     if (overlayRef.current) {
       map.removeLayer(overlayRef.current);
     }
     overlayRef.current = L.layerGroup().addTo(map);
 
-    // במידה ואין routeData, ניתן להציג רק Marker יחיד
+    // If no routeData is provided, optionally show a single marker
     if (!routeData) {
       if (showMarkers && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
         L.marker([centerLat, centerLng]).addTo(overlayRef.current).bindPopup('Location');
@@ -110,16 +108,16 @@ const RouteMap = ({
       return;
     }
 
-    // פונקציה להזחת נקודת סוף המסלול – כדי שהסמן לא יסתיר את קו המסלול
+    // Slightly nudge the end marker so it doesn't overlap the polyline
     const nudge = ([lat, lng], eastM = 6, northM = -6) => {
       const mPerDegLat = 111320;
       const mPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
       return [lat + northM / mPerDegLat, lng + eastM / mPerDegLng];
     };
 
-    // ציור מסלולים יומיים – מוגבל ל־2 ימים
+    // Render daily routes — limited to 2 days
     if (showRoute && Array.isArray(routeData.dailyRoutes)) {
-      let allBounds = null; // ישמש לקביעת תצוגת zoom אוטומטית
+      let allBounds = null; // Used to compute an automatic zoom to fit all routes
 
       routeData.dailyRoutes.slice(0, 2).forEach((dayRoute, idx) => {
         const dayPoints = (dayRoute.points && dayRoute.points.length)
@@ -130,36 +128,36 @@ const RouteMap = ({
 
         const latlngs = dayPoints.map(p => [p.lat, p.lng]);
 
-        // יצירת קו המסלול בצבע שונה לכל יום
+        // Create the polyline for this day's route with a distinct color
         const line = L.polyline(latlngs, {
           color: COLORS[idx],
           weight: 4,
           opacity: 0.9
         }).addTo(overlayRef.current);
 
-        // סמן נקודת ההתחלה
+        // Start marker
         L.marker(latlngs[0], { zIndexOffset: 1000 })
           .addTo(overlayRef.current)
           .bindPopup(`Start Day ${dayRoute.day}`);
 
-        // סמן נקודת הסיום – מוזחת מעט כדי לא לחפוף לקו
+        // End marker — slightly offset so it doesn't overlap the line
         if (latlngs.length > 1) {
           L.marker(nudge(latlngs[latlngs.length - 1]), { zIndexOffset: 900 })
             .addTo(overlayRef.current)
             .bindPopup(`End Day ${dayRoute.day}`);
         }
 
-        // עדכון גבולות התצוגה כך שיכללו את כל המסלול
+        // Extend the overall bounds to include this route
         const bounds = line.getBounds();
         allBounds = allBounds ? allBounds.extend(bounds) : bounds;
       });
 
-      // התאמת המפה לכל המסלולים
+      // Fit the map view to include all routes
       if (allBounds) map.fitBounds(allBounds, { padding: [20, 20] });
       return;
     }
 
-    // מצב fallback – מציג רק מיקום אחד
+    // Fallback mode — show a single location marker
     if (showMarkers && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
       L.marker([centerLat, centerLng]).addTo(overlayRef.current).bindPopup('Location');
     }

@@ -10,7 +10,6 @@ import { MapPin, Compass, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TripPlanner = () => {
-  // טופס תכנון: שומרים את כל הערכים במקום אחד כדי לפשט שליחה לשרת
   const [formData, setFormData] = useState({
     location: null,
     tripType: 'hiking',
@@ -18,21 +17,19 @@ const TripPlanner = () => {
     name: '',
     description: ''
   });
-  // דגלי טעינה נפרדים: יצירת מסלול / טעינת מזג אוויר
+
   const [loading, setLoading] = useState(false);
   const [weatherLoading, setWeatherLoading] = useState(false);
 
-  // תוצרים מהשרת: נתוני מסלול, מזג אוויר, תמונה
   const [routeData, setRouteData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [imageData, setImageData] = useState(null);
 
-  // שליטה על UI לשלב השמירה (כדי לא להעמיס לפני שיש מסלול)
   const [showSaveFields, setShowSaveFields] = useState(false);
 
   const navigate = useNavigate();
 
-  // שם אוטומטי למסלול לפי מיקום וסוג — החלטת UX: חוסך למשתמש הקלדה
+  // Auto-generate a trip name based on location & type — UX decision: saves user typing
   const getAutoTripName = () => {
     if (!formData.location?.name) return `Unknown ${formData.tripType} trip`;
     const parts = formData.location.name.split(',');
@@ -41,22 +38,19 @@ const TripPlanner = () => {
     return `${city}, ${country} ${formData.tripType} trip`;
   };
 
-  // -------- יצירת מסלול + טעינת מזג אוויר אוטומטית --------
   const generateRoute = async () => {
-    // מונעים קריאה לשרת בלי מיקום שנבחר בפועל (מהאוטוקומפליט)
     if (!formData.location) {
       toast.error('Please select a location from the list');
       return;
     }
 
-    // מקבעים lat/lng כמספרים — מונע תקלות מסוג מחרוזת
     const payload = {
       name: formData.location?.name || '',
       lat: Number(formData.location?.lat || 0),
       lng: Number(formData.location?.lng || 0),
     };
 
-    // איפוס תוצרים קודמים לפני יצירה חדשה
+    // Reset UI state before generating a new route
     setLoading(true);
     setRouteData(null);
     setWeatherData(null);
@@ -64,17 +58,15 @@ const TripPlanner = () => {
     setShowSaveFields(false);
 
     try {
-      // 1) בקשת תכנון מסלול (ה-API מחזיר גם route וגם image)
       const result = await tripService.planTrip(payload, formData.tripType);
       setRouteData(result.route || null);
       setImageData(result.image || null);
       toast.success('Route generated successfully!');
 
-      // 2) מזג אוויר נטען מידית לפי נקודת ההתחלה — החלטת מוצר לנוחות
       setWeatherLoading(true);
       try {
         const data = await weatherService.getForecast(payload.lat, payload.lng);
-        setWeatherData(data); // פורמט צפוי: { forecast: [...] }
+        setWeatherData(data);
       } catch (err) {
         toast.error('Failed to load weather.');
       } finally {
@@ -87,23 +79,20 @@ const TripPlanner = () => {
     }
   };
 
-  // -------- שמירת מסלול (לא שומרים weather בבסיס הנתונים) --------
   const handleSaveClick = () => {
     if (!routeData) {
       toast.error('No route data to save');
       return;
     }
-    setShowSaveFields(true); // רק אחרי שיש מסלול מציגים שדות שמירה
+    setShowSaveFields(true);
   };
 
   const confirmSave = async () => {
     try {
-      // חילוץ עיר/מדינה משם המיקום — פתרון פשוט למבנים שונים של האוטוקומפליט
       const [cityPart, ...restParts] = (formData.location?.name || '').split(',');
       const city = cityPart?.trim() || 'Unknown';
       const country = restParts.pop()?.trim() || 'Unknown';
 
-      // אובייקט שמירה: כולל routeData ותמונה; מזג אוויר לא נשמר כדי לחסוך נפח וקריאות
       const routeToSave = {
         name: getAutoTripName(),
         description: formData.description?.trim() || `Route in ${city}, ${country}`,
@@ -122,13 +111,13 @@ const TripPlanner = () => {
 
       await tripService.createRoute(routeToSave);
       toast.success('Route saved successfully!');
-      navigate('/routes'); // לאחר שמירה — מעבר למסכים שמציגים את הרשימה
+      navigate('/routes');
     } catch (error) {
       toast.error('Failed to save route. Please try again.');
     }
   };
 
-  // חישובי תקציר להצגה — נשמרים מחוץ ל-JSX לניקיון
+  // Summary calculations for display — kept outside JSX for cleanliness
   const getRouteStats = () => {
     if (!routeData) return null;
     return {
@@ -139,12 +128,10 @@ const TripPlanner = () => {
   };
 
   const stats = getRouteStats();
-  
-
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* כותרת ודחיפה חזרה ל-Home */}
+      {/* Header and back navigation to Home */}
       <div className="mb-8">
         <button
           onClick={() => navigate('/')}
@@ -160,14 +147,14 @@ const TripPlanner = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* טופס התכנון (עמודה שמאלית) */}
+        {/* Planning form (left column) */}
         <div className="lg:col-span-1">
           <div className="card">
             <div className="card-header">
               <h2 className="text-xl font-semibold text-gray-900">Trip Details</h2>
             </div>
             <div className="card-body space-y-6">
-              {/* בחירת מיקום דרך קומפוננטת חיפוש — מחזירה אובייקט מאוחד */}
+              {/* Select location via the search component — returns a unified object */}
               <div>
                 <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
                   <MapPin className="h-4 w-4 inline mr-1" />
@@ -183,7 +170,7 @@ const TripPlanner = () => {
                 )}
               </div>
 
-              {/* סוג טיול — משפיע על החוקים בצד השרת (הליכה/אופניים) */}
+              {/* Trip type — affects server-side rules (walking/biking) */}
               <div>
                 <label htmlFor="tripType" className="block text-sm font-medium text-gray-700 mb-2">
                   <Compass className="h-4 w-4 inline mr-1" />
@@ -215,7 +202,7 @@ const TripPlanner = () => {
                 </div>
               </div>
 
-              {/* הפקת מסלול: נועל כפתור בזמן חישוב כדי למנוע לחיצות כפולות */}
+              {/* Generate route: disable the button during computation to prevent double clicks */}
               <button
                 onClick={generateRoute}
                 disabled={loading || !formData.location}
@@ -231,7 +218,7 @@ const TripPlanner = () => {
                 )}
               </button>
 
-              {/* תהליך שמירה דו-שלבי: קודם להציג, אחר כך לאשר — מונע טעויות */}
+              {/* Two-step save flow: preview first, then confirm — prevents mistakes */}
               {!showSaveFields ? (
                 <button
                   onClick={handleSaveClick}
@@ -265,7 +252,7 @@ const TripPlanner = () => {
             </div>
           </div>
 
-          {/* תקציר המסלול — מחזק ערך מידי לפני שמירה */}
+          {/* Route summary — reinforces immediate value before saving */}
           {stats && (
             <div className="card mt-6">
               <div className="card-header">
@@ -281,8 +268,8 @@ const TripPlanner = () => {
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
-                      {Number.isFinite(stats.totalDuration)
-                        ? parseFloat(stats.totalDuration.toFixed(1)).toString()
+                      {Number.isFinite(stats?.totalDuration)
+                        ? stats.totalDuration.toFixed(2)
                         : '-'}
                     </div>
                     <div className="text-sm text-gray-600">Duration (hours)</div>
@@ -306,9 +293,9 @@ const TripPlanner = () => {
           )}
         </div>
 
-        {/* מפה ומזג אוויר (עמודה ימנית) */}
+        {/* Map & weather (right column) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* מפה אינטראקטיבית של המסלול */}
+          {/* Interactive route map */}
           <div className="card">
             <div className="card-header">
               <h3 className="text-lg font-semibold text-gray-900">Route Map</h3>
@@ -336,7 +323,7 @@ const TripPlanner = () => {
             </div>
           </div>
 
-          {/* מזג אוויר — נטען אוטומטית אחרי יצירת מסלול; מציגים מצב טעינה/חוסר זמינות */}
+          {/* Weather — auto-loads after generating the route; show loading/unavailable states */}
           {routeData && (
             <div className="card">
               <div className="card-header">
@@ -354,7 +341,7 @@ const TripPlanner = () => {
             </div>
           )}
 
-          {/* תמונת יעד — מסייעת לקונטקסט ויזואלי, לא קריטי לפונקציונליות */}
+          {/* Destination image — provides visual context, not critical to functionality */}
           {imageData && (
             <div className="card">
               <div className="card-header">
@@ -364,7 +351,7 @@ const TripPlanner = () => {
                 <img
                   src={imageData.url}
                   alt={imageData.alt || 'Destination'}
-                  className="w-full h-72 object-cover rounded-lg"
+                  className="w-full h-48 object-cover rounded-lg"
                 />
               </div>
             </div>

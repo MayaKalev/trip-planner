@@ -1,21 +1,21 @@
 // server/routes/weather.js
 const express = require('express');
 const { getWeatherData } = require('../controllers/weatherController');
-const { protect } = require('../middleware/auth'); // Middleware שמוודא שהמשתמש מחובר (JWT)
+const { protect } = require('../middleware/auth'); // Middleware that ensures the user is authenticated (JWT)
 const router = express.Router();
 
 /**
- * מסלול API – קבלת תחזית מזג אוויר ל־3 ימים הבאים לפי קואורדינטות
- * הנתיב כולל שני פרמטרים דינמיים: lat ו־lng
- * דוגמה לשימוש: GET /api/weather/32.0853/34.7818
+ * API route — get a 3-day weather forecast by coordinates.
+ * The path takes two dynamic params: lat and lng.
+ * Example: GET /api/weather/32.0853/34.7818
  */
-router.get('/:lat/:lng', async (req, res, next) => {
+router.get('/:lat/:lng', protect, async (req, res, next) => {
   try {
-    // המרת הפרמטרים למספרים על מנת לוודא שניתן לעבוד איתם
+    // Convert params to numbers to ensure we can work with them
     const lat = Number(req.params.lat);
     const lng = Number(req.params.lng);
 
-    // ולידציה – במקרה שהקואורדינטות לא חוקיות מחזירים שגיאה 400
+    // Validation — if the coordinates are invalid, return a 400 error
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return res.status(400).json({
         success: false,
@@ -23,13 +23,11 @@ router.get('/:lat/:lng', async (req, res, next) => {
       });
     }
 
-    // קריאה לפונקציית הלוגיקה שמביאה תחזית עדכנית מה־API של OpenWeatherMap
+    // Call the logic function that fetches the latest forecast from the OpenWeatherMap API
     const data = await getWeatherData(lat, lng);
 
-    // החזרת הנתונים בפורמט אחיד ללקוח
     return res.json({ success: true, data });
   } catch (err) {
-    // העברת השגיאה למנגנון הטיפול המרכזי ב־Express
     return next(err);
   }
 });

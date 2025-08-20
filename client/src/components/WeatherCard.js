@@ -2,13 +2,12 @@ import React from 'react';
 import { Calendar, Thermometer, Droplets, Wind } from 'lucide-react';
 
 /**
- * קומפוננטה להצגת תחזית מזג אוויר.
- * מקבלת:
- * - weather: אובייקט עם שדה forecast (מערך של ימים)
- * - location: שם מיקום להצגה מעל התחזית
+ * Component for displaying a weather forecast.
+ * Props:
+ * - weather: object with a `forecast` field (array of days)
+ * - location: place name to display above the forecast
  */
 const WeatherCard = ({ weather, location }) => {
-  // בדיקה – אם אין נתונים, מציגים כרטיס עם הודעה שאין נתוני מזג אוויר
   if (!weather || !weather.forecast) {
     return (
       <div className="card">
@@ -22,10 +21,6 @@ const WeatherCard = ({ weather, location }) => {
     );
   }
 
-  /**
-   * פונקציה לעיצוב תאריך בפורמט קצר (לדוגמה: Mon, Sep 5)
-   * נועדה להציג את התאריך של כל יום בתחזית בצורה קריאה
-   */
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -35,10 +30,6 @@ const WeatherCard = ({ weather, location }) => {
     });
   };
 
-  /**
-   * פונקציה להחזרת אימוג'י בהתאם לקוד האייקון של מזג האוויר
-   * מאפשרת הצגת מצב השמיים בצורה גרפית פשוטה במקום טעינת תמונות
-   */
   const getWeatherIcon = (iconCode) => {
     const iconMap = {
       '01d': '☀️', '01n': '🌙',
@@ -51,27 +42,27 @@ const WeatherCard = ({ weather, location }) => {
       '13d': '❄️', '13n': '❄️',
       '50d': '🌫️', '50n': '🌫️',
     };
-    return iconMap[iconCode] || '🌤️'; // אם הקוד לא נמצא, ברירת המחדל היא שמש עם עננים
+    return iconMap[iconCode] || '🌤️';
   };
 
   return (
     <div className="card">
       <div className="card-header">
         <h3 className="text-lg font-semibold text-gray-900">Weather Forecast</h3>
-        {/* מציגים את שם המיקום והמדינה אם המידע קיים */}
+        {/* Show location name and country if available */}
         {location && (
           <p className="text-sm text-gray-600 mt-1">
-            {location.name}, {location.country}
+            {location.country ? `${location.name}, ${location.country}` : location.name}
           </p>
         )}
       </div>
 
       <div className="card-body">
-        {/* גריד של כרטיסים – אחד לכל יום בתחזית */}
+        {/* Grid of cards — one for each day in the forecast */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {weather.forecast.map((day, index) => (
             <div key={index} className="bg-gray-50 rounded-lg p-4">
-              {/* שורת כותרת עם תאריך ואייקון מזג אוויר */}
+              {/* Header row with date and weather icon */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
                   <Calendar className="h-4 w-4 text-gray-500" />
@@ -82,7 +73,7 @@ const WeatherCard = ({ weather, location }) => {
                 <span className="text-2xl">{getWeatherIcon(day.icon)}</span>
               </div>
 
-              {/* מידע מפורט – טמפרטורה גבוהה, נמוכה, אחוזי גשם ומהירות רוח */}
+              {/* Details — high/low temperature, precipitation %, and wind speed */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-1">
@@ -125,7 +116,7 @@ const WeatherCard = ({ weather, location }) => {
                 </div>
               </div>
 
-              {/* תיאור כללי של מזג האוויר לאותו יום */}
+              {/* General weather description for the day */}
               <div className="mt-3 pt-3 border-t border-gray-200">
                 <p className="text-sm text-gray-700 capitalize">
                   {day.description}

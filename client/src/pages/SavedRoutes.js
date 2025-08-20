@@ -9,18 +9,12 @@ import { MapPin, Calendar, Eye, Filter, Plus, Trash2, RefreshCw } from 'lucide-r
 import toast from 'react-hot-toast';
 
 const SavedRoutes = () => {
-  // שומרים רק תקצירים בטעינה הראשונה; פרטים מלאים נטען לפי בחירה (Lazy load)
   const [routes, setRoutes] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState(null);
-
-  // נפריד בין "טוען רשימה" ל—"טוען פרטי מסלול נבחר" לצורך UX ברור
   const [loading, setLoading] = useState(true);
   const [selectLoading, setSelectLoading] = useState(false);
-
-  // סינון בסיסי לפי סוג טיול; קל להרחבה בעתיד (שם/מדינה וכו')
   const [filter, setFilter] = useState({ tripType: '' });
 
-  // מזג אוויר "לפי דרישה" ולא אוטומטי — חוסך קריאות API מיותרות
   const [weatherData, setWeatherData] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
 
@@ -28,7 +22,7 @@ const SavedRoutes = () => {
     fetchRoutes();
   }, []);
 
-  // טעינת תקצירי המסלולים (summary) מהשרת
+  // Load route summaries from the server
   const fetchRoutes = async () => {
     try {
       const response = await routeService.getRoutes({}, { noCache: true }); // summaries
@@ -40,14 +34,14 @@ const SavedRoutes = () => {
     }
   };
 
-  // בחירת מסלול מהרשימה → טוענים פרטים מלאים בלבד למסלול הנבחר
+  // Selecting a route from the list → load full details only for the chosen route
   const handleSelectRoute = async (routeSummary) => {
     try {
       setSelectLoading(true);
-      setWeatherData(null); // איפוס תחזית כשמחליפים מסלול
+      setWeatherData(null);
       const id = routeSummary.id ?? routeSummary._id;
       const payload = await routeService.getRoute(id, { noCache: true });
-      const full = payload.route ?? payload; // תומך גם ב- { route } וגם באובייקט ישיר
+      const full = payload.route ?? payload;
       setSelectedRoute(full);
     } catch (e) {
       toast.error('Failed to load route details');
@@ -56,7 +50,7 @@ const SavedRoutes = () => {
     }
   };
 
-  // מחיקת מסלול: עדכון אופטימי של הרשימה, ותיקון מצב המסך אם המסלול שנצפה נמחק
+  // Delete a route and clear selection/weather if it was the selected one
   const handleDeleteRoute = async (routeId) => {
     if (!window.confirm('Are you sure you want to delete this route?')) return;
     try {
@@ -72,7 +66,6 @@ const SavedRoutes = () => {
     }
   };
 
-  // סינון בצד לקוח — פשוט ומהיר עבור רשימות קצרות
   const filteredRoutes = routes.filter(route => {
     if (filter.tripType && route.tripType !== filter.tripType) return false;
     return true;
@@ -83,8 +76,7 @@ const SavedRoutes = () => {
 
   const getTripTypeIcon = (tripType) => (tripType === 'hiking' ? '🥾' : '🚴');
 
-  // הבאת תחזית לפי דרישה:
-  // קודם ננסה center; אם אין, ניפול ל-location.coordinates — שומר על גמישות מבנה הנתונים
+  // Fetch weather for the selected route's starting coordinates
   const fetchWeather = async () => {
     if (!selectedRoute) return;
     let lat, lng;
@@ -102,7 +94,7 @@ const SavedRoutes = () => {
     setWeatherLoading(true);
     try {
       const data = await weatherService.getForecast(lat, lng);
-      setWeatherData(data); // צפוי אובייקט עם forecast
+      setWeatherData(data);
       toast.success('Weather loaded');
     } catch (err) {
       toast.error('Failed to load weather.');
@@ -115,14 +107,14 @@ const SavedRoutes = () => {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* כותרת ודחיפה לפעולה לתכנון מסלול חדש */}
+      {/* Header and CTA to plan a new route */}
       <div className="mb-8">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">My Routes</h1>
             <p className="text-gray-600">View and manage your saved trip routes</p>
           </div>
-          {/* CTA ראשי לתכנון חדש — משאיר את הרשימה זמינה מימין */}
+          {/* Primary CTA to plan a new trip — keeps the list accessible on the side */}
           <Link to="/plan" className="btn btn-primary">
             <Plus className="h-4 w-4 mr-2" />
             Plan New Trip
@@ -131,9 +123,9 @@ const SavedRoutes = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* עמודה שמאלית — מסננים ורשימת מסלולים */}
+        {/* Left column — filters and routes list */}
         <div className="lg:col-span-1">
-          {/* מסנן בסיסי: סוג טיול */}
+          {/* Basic filter: trip type */}
           <div className="card mb-6">
             <div className="card-header">
               <div className="flex items-center">
@@ -157,7 +149,7 @@ const SavedRoutes = () => {
             </div>
           </div>
 
-          {/* רשימת המסלולים (תקצירים) */}
+          {/* Routes list (summaries) */}
           <div className="space-y-4">
             {filteredRoutes.length === 0 ? (
               <div className="card">
@@ -176,7 +168,7 @@ const SavedRoutes = () => {
                   key={route.id ?? route._id}
                   className={`card cursor-pointer transition-all ${
                     (selectedRoute?.id ?? selectedRoute?._id) === (route.id ?? route._id)
-                      ? 'ring-2 ring-blue-500 bg-blue-50' // מדגיש את המסלול הנבחר
+                      ? 'ring-2 ring-blue-500 bg-blue-50' // highlights the selected route
                       : 'hover:shadow-md'
                   }`}
                   onClick={() => handleSelectRoute(route)}
@@ -187,7 +179,7 @@ const SavedRoutes = () => {
                         <span className="text-xl">{getTripTypeIcon(route.tripType)}</span>
                         <h3 className="font-semibold text-gray-900">{route.name}</h3>
                       </div>
-                      {/* כפתור מחיקה קטן בפינה — עוצר bubbling כדי לא לבחור את הכרטיס בטעות */}
+                      {/* Small delete button in the corner — stops bubbling to avoid selecting the card by mistake */}
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteRoute(route.id ?? route._id); }}
                         className="text-red-500 hover:text-red-700 p-1"
@@ -198,7 +190,7 @@ const SavedRoutes = () => {
 
                     {route.description && <p className="text-gray-600 text-sm mb-3">{route.description}</p>}
 
-                    {/* שורת מידע קצרה: מיקום + תאריך יצירה */}
+                    {/* Short info row: location + creation date */}
                     <div className="flex items-center space-x-4 text-sm text-gray-500 mb-3">
                       <div className="flex items-center">
                         <MapPin className="h-3 w-3 mr-1" />
@@ -210,7 +202,7 @@ const SavedRoutes = () => {
                       </div>
                     </div>
 
-                    {/* מרחק וזמן בפורמט ידידותי מהשרת */}
+                    {/* Distance and duration in a user-friendly format from the server */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4 text-sm">
                         <span className="text-blue-600 font-medium">{route.formattedDistance}</span>
@@ -224,7 +216,7 @@ const SavedRoutes = () => {
           </div>
         </div>
 
-        {/* עמודה ימנית — פרטי המסלול הנבחר */}
+        {/* Right column — details of the selected route */}
         <div className="lg:col-span-2">
           {selectLoading && (
             <div className="card mb-4">
@@ -234,7 +226,7 @@ const SavedRoutes = () => {
 
           {selectedRoute ? (
             <div className="space-y-6">
-              {/* כותרת פרטי מסלול */}
+              {/* Route details header */}
               <div className="card">
                 <div className="card-header">
                   <div className="flex items-center justify-between">
@@ -249,7 +241,7 @@ const SavedRoutes = () => {
                 <div className="card-body">
                   {selectedRoute.description && <p className="text-gray-700 mb-4">{selectedRoute.description}</p>}
 
-                  {/* כרטיסי מדדים קטנים: מרחק, משך, ימים, תאריך יצירה */}
+                  {/* Small metric cards: distance, duration, days, created date */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-600">
@@ -278,7 +270,7 @@ const SavedRoutes = () => {
                 </div>
               </div>
 
-              {/* מפה אינטראקטיבית של המסלול הנבחר */}
+              {/* Interactive map of the selected route */}
               <div className="card">
                 <div className="card-header">
                   <h3 className="text-lg font-semibold text-gray-900">Route Map</h3>
@@ -300,7 +292,7 @@ const SavedRoutes = () => {
                 </div>
               </div>
 
-              {/* תחזית מזג אוויר לפי לחיצה — לא "מרעישים" את ה-API שלא לצורך */}
+              {/* On-demand weather forecast — avoid hitting the API unnecessarily */}
               <div className="card">
                 <div className="card-header flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-gray-900">Weather Forecast</h3>
@@ -340,7 +332,7 @@ const SavedRoutes = () => {
                 </div>
               </div>
 
-              {/* תמונת יעד אם קיימת */}
+              {/* Destination image if available */}
               {selectedRoute.image && (
                 <div className="card">
                   <div className="card-header">
@@ -357,7 +349,7 @@ const SavedRoutes = () => {
               )}
             </div>
           ) : (
-            // מצב ריק — מדרבן לבחור מסלול
+            // Empty state — encourages selecting a route
             <div className="card">
               <div className="card-body text-center py-16">
                 <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />

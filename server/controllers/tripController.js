@@ -3,21 +3,21 @@ const { fetchImageByLocation } = require('../controllers/imageController');
 const Groq = require('groq-sdk');
 const axios = require('axios');
 
-// לקוח Groq – משמש ליצירת נקודות דרך (waypoints) ע"י מודל LLM
+// Groq client — used to generate waypoints via an LLM
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// פרמטרי תצורה עם ברירות מחדל בטוחות
+// Configuration parameters with safe defaults
 const CYCLING_MAX_KM_PER_DAY = Number(process.env.CYCLING_MAX_KM_PER_DAY ?? 60);
 const HIKING_MIN_KM = Number(process.env.HIKING_MIN_KM ?? 5);
 const HIKING_MAX_KM = Number(process.env.HIKING_MAX_KM ?? 15);
-const SNAP_RADII = [200, 400, 800];          // נסיונות הולכים וגדלים ל־snap לרשת דרכים
-const MIN_WPS_AFTER_SNAP = 3;                 // מינימום נקודות לאחר snap כדי להחשב כנתיב סביר
-const LOOP_CLOSE_METERS = 120;                // סגירת לולאה אם נקודת סיום רחוקה מההתחלה מעבר לסף
+const SNAP_RADII = [200, 400, 800];          // progressively larger attempts to snap to the road network
+const MIN_WPS_AFTER_SNAP = 3;                 // minimum points after snap to consider it a plausible route
+const LOOP_CLOSE_METERS = 120;                // close loop if end point is farther than this from the start
 
-// המרות/חישובים גיאומטריים בסיסיים
+// Basic geometric conversions/computations
 const toRad = d => (d * Math.PI) / 180;
 
-// מרחק Haversine בין שני זוגות [lon,lat] במטרים
+// Haversine distance between two [lon,lat] pairs in meters
 function haversineMetersLonLat(a, b) {
   const [lon1, lat1] = a;
   const [lon2, lat2] = b;
@@ -29,7 +29,7 @@ function haversineMetersLonLat(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// דילול נקודות לאורך ציר – מפחית רעש/עומס בקואורדינטות לפני בקשות ORS
+// Decimate points along the path — reduces noise/overhead in coordinates before ORS requests
 function decimateLonLat(coords, keepEvery = 2) {
   if (!Array.isArray(coords) || coords.length <= 2) return coords;
   const out = [];
@@ -39,7 +39,7 @@ function decimateLonLat(coords, keepEvery = 2) {
   return out;
 }
 
-// מבטיח מסלול מעגלי ע"י הוספת נקודת ההתחלה לסוף אם צריך (להליכת יום אחד)
+// Ensure a circular route by appending the start point to the end if needed (for single-day hiking)
 function ensureLoop(coords) {
   if (!coords || coords.length < 2) return coords;
   const start = coords[0];
@@ -49,11 +49,11 @@ function ensureLoop(coords) {
   return coords;
 }
 
-// נקודת קצה API: תכנון טיול – מייצר מסלול ותמונת יעד (ללא תחזית מזג אוויר)
+// API endpoint: trip planning — generates a route and a destination image (no weather here)
 const planTrip = asyncHandler(async (req, res) => {
   let { location, tripType } = req.body;
 
-  // תמיכה בקבלת location כמחרוזת JSON (למניעת תקלות אינטגרציה מהלקוח)
+  // Support receiving location as a JSON string (to prevent client integration issues)
   if (typeof location === 'string') {
     try {
       location = JSON.parse(location);
@@ -65,7 +65,7 @@ const planTrip = asyncHandler(async (req, res) => {
   const lat = Number(location?.lat);
   const lng = Number(location?.lng);
 
-  // ולידציה בטוחה ל־lat/lng (0 ערך חוקי)
+  // Safe validation for lat/lng (0 is a valid value)
   if (!location || !Number.isFinite(lat) || !Number.isFinite(lng)) {
     return res.status(400).json({
       success: false,
@@ -74,10 +74,10 @@ const planTrip = asyncHandler(async (req, res) => {
   }
 
   try {
-    // יצירת מסלול לפי שם מיקום וסוג טיול – כולל אינטראקציה עם LLM ו־OpenRouteService
+    // Create route by location name and trip type — includes interaction with LLM and OpenRouteService
     const routeData = await generateRoute(location.name, tripType);
 
-    // ניסיון להביא תמונת יעד לפי שם המיקום (אופציונלי; יש fallback פנימי)
+    // Try to fetch a destination image by location name (optional; has internal fallback)
     const imageData = await fetchImageByLocation(location.name);
 
     return res.json({
@@ -92,7 +92,7 @@ const planTrip = asyncHandler(async (req, res) => {
   }
 });
 
-// יצירת מסלול: לולאת נסיונות – קודם LLM לנקודות דרך, אחר כך ORS למסלול
+// Route generation: retry loop — first LLM waypoints, then ORS for routing
 const generateRoute = async (location, tripType) => {
   const maxAiAttempts = 6;
 
@@ -101,13 +101,13 @@ const generateRoute = async (location, tripType) => {
     const isRetry = attempt > 1;
     const waypointsResponse = await generateRouteWithAI(location, tripType, isRetry);
 
-    // החזרה על נסיון אם אין JSON תקין עם מערך waypoints
+    // Retry if no valid JSON with a waypoints array
     if (!waypointsResponse || !Array.isArray(waypointsResponse.waypoints)) {
       await new Promise(r => setTimeout(r, 800));
       continue;
     }
 
-    // ולידציה של נקודות דרך (לא בקו ישר, ערכים תקינים וכו')
+    // Validate waypoints (not a straight line, valid values, etc.)
     if (!isWaypointsValid(waypointsResponse.waypoints)) {
       await new Promise(r => setTimeout(r, 800));
       continue;
@@ -116,11 +116,11 @@ const generateRoute = async (location, tripType) => {
     try {
       const apiKey = process.env.OPENROUTESERVICE_API_KEY;
 
-      // בניית המסלול הסופי לפי ORS ותנאי המוצר (הליכה מעגלית / אופניים יומיים)
+      // Build the final route via ORS according to product rules (circular hike / 2-day cycling)
       const route = await generateRouteWithOpenRouteService(waypointsResponse.waypoints, tripType);
       return route;
     } catch (orsError) {
-      // כשל ב־ORS: ננסה שוב עם סט נקודות חדש מה־LLM
+      // ORS failure: try again with a new set of AI waypoints
       console.warn(`OpenRouteService failed: ${orsError.message} — retrying with new AI waypoints...`);
       await new Promise(r => setTimeout(r, 900));
       continue; 
@@ -130,14 +130,14 @@ const generateRoute = async (location, tripType) => {
   throw new Error("AI failed to generate realistic waypoints after multiple attempts.");
 };
 
-// הצמדת נקודות לנתיבי נסיעה/הליכה בפועל ע"י שירות ה־snap של ORS
+// Snap waypoints to actual road/trail network using ORS snap service
 const snapWaypoints = async (waypoints, tripType) => {
   const profile = tripType === 'cycling' ? 'cycling-regular' : 'foot-hiking';
-  const locs = waypoints.map(wp => [wp.lng, wp.lat]); // מבנה ORS: [lon,lat]
+  const locs = waypoints.map(wp => [wp.lng, wp.lat]); // ORS expects [lon,lat]
 
   let lastErr = null;
 
-  // מנסים רדיוסים הולכים וגדלים – כדי לשפר התאמה לרשת
+  // Try increasing radii to improve network match
   for (const radius of SNAP_RADII) {
     try {
       const { data } = await axios.post(
@@ -153,11 +153,11 @@ const snapWaypoints = async (waypoints, tripType) => {
         }
       );
 
-      // חילוץ קואורדינטות תקינות בלבד
+      // Extract only valid coordinates
       const raw = (data?.locations || []).map(item => item?.location || null);
       const filtered = raw.filter(p => Array.isArray(p) && p.length === 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]));
 
-      // דה-דופליקציה בסיסית לפי מרחק מינימלי בין נקודות סמוכות (30מ')
+      // Basic de-duplication based on minimum distance between adjacent points (30 m)
       const deduped = [];
       for (const c of filtered) {
         const ok = deduped.every(prev => haversineMetersLonLat(prev, c) > 30);
@@ -175,11 +175,11 @@ const snapWaypoints = async (waypoints, tripType) => {
     }
   }
 
-  // אם כל הנסיונות נכשלו – אין מספיק נקודות snapped כדי לבנות מסלול סביר
+  // If all attempts failed — too few snapped points to build a viable route
   throw new Error(`Snap failed: too few snapped waypoints (< ${MIN_WPS_AFTER_SNAP})`);
 };
 
-// מצטבר מרחקים בין נקודות – מאפשר חיתוך לימים/יעדים
+// Accumulate distances between points — enables splitting by days/targets
 function cumulativeMeters(coords) {
   const cum = [0];
   for (let i = 1; i < coords.length; i++) {
@@ -188,7 +188,7 @@ function cumulativeMeters(coords) {
   return cum;
 }
 
-// בחירת אינדקס ביניים ע"פ רדיוס יעד מההתחלה – שימושי ליצירת לולאה קצרה
+// Pick a mid index by target radius from the start — useful for creating a short loop
 function pickMidIndexByRadius(locs, start, targetMeters) {
   let bestIdx = 1, bestDiff = Infinity;
   for (let i = 1; i < locs.length; i++) {
@@ -199,18 +199,18 @@ function pickMidIndexByRadius(locs, start, targetMeters) {
   return bestIdx;
 }
 
-// בניית מסלול מפורט בעזרת ORS בהתאם לחוקי המוצר (הליכה/אופניים)
+// Build a detailed route with ORS according to product rules (hiking/cycling)
 const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
   try {
-    const snapped = await snapWaypoints(waypoints, tripType); // תוצאה: [[lon,lat], ...]
+    const snapped = await snapWaypoints(waypoints, tripType); // result: [[lon,lat], ...]
     const originalSnapped = [...snapped];
 
-    // הליכה חייבת להיות מעגלית; אופניים – לא
+    // Hiking must be circular; cycling — not
     let coordinates = (tripType === 'hiking')
       ? ensureLoop([...snapped])
       : [...snapped];
 
-    // מעטפת לבניית route מ־ORS; יש fallback אם הפרמטר options לא נתמך
+    // Wrapper for building a route from ORS; has fallback if the 'options' parameter is unsupported
     const buildRoute = async (coords) => {
       const profile = tripType === 'cycling' ? 'cycling-regular' : 'foot-hiking';
       const url = `https://api.openrouteservice.org/v2/directions/${profile}/geojson`;
@@ -233,7 +233,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
           timeout: 30000
         });
       } catch (err) {
-        // ישנן תצורות ORS שלא מכירות את options/avoid_features – ננסה שוב בלי
+        // Some ORS deployments do not recognize options/avoid_features — retry without them
         const msg = err.response?.data?.error?.message || '';
         const isUnknownParam =
           err.response?.status === 400 &&
@@ -257,10 +257,10 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
       return response.data.features[0];
     };
 
-    // בקשה ראשונה ל־ORS
+    // First request to ORS
     let feature = await buildRoute(coordinates);
 
-    // חישוב מרחק/זמן – אם אין summary, נחשב ידנית ע"ס קואורדינטות
+    // Compute distance/time — if no summary, compute manually from coordinates
     const readDistanceSec = (feat) => {
       const coords = feat.geometry.coordinates;
       const props = feat.properties || {};
@@ -278,9 +278,9 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
     let distanceKm = totalMeters / 1000;
 
     if (tripType === 'cycling') {
-      // אופניים: מסלול של 2 ימים, עד X ק"מ בכל יום (סה"כ עד 2X)
+      // Cycling: 2-day route, up to X km per day (max 2X total)
       if (distanceKm > CYCLING_MAX_KM_PER_DAY * 2) {
-        // נסיונות דילול נקודות לפני ORS כדי לקצר את המסלול
+        // Try decimating points before ORS to shorten the route
         for (const k of [2, 3]) {
           console.warn(`Cycling ${distanceKm.toFixed(1)} km > ${CYCLING_MAX_KM_PER_DAY*2} km, decimate keepEvery=${k}...`);
           const decimated = decimateLonLat(coordinates, k);
@@ -294,7 +294,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
         throw new Error(`Cycling route too long: ${distanceKm.toFixed(1)} km (max ${CYCLING_MAX_KM_PER_DAY*2} km total).`);
       }
 
-      // חיתוך ליום 1 ויום 2 לפי מרחק מצטבר כדי לא לעבור את מגבלת היום
+      // Split into day 1 and day 2 by cumulative distance so each day stays under the cap
       const coords = feature.geometry.coordinates;
       const cum = cumulativeMeters(coords);
 
@@ -314,7 +314,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
       const day1Meters = cum[splitIdx];
       const day2Meters = totalMeters - day1Meters;
 
-      // המרה למבנה נקודות בפורמט הלקוח (lat/lng + שיוך ליום)
+      // Convert to client point format (lat/lng) with day assignment
       const points = coords.map(([lon, lat], i) => ({
         lat, lng: lon, day: (i <= splitIdx ? 1 : 2), order: i
       }));
@@ -334,7 +334,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
         }
       ];
 
-      // אכיפת מגבלת מרחק ליום עם טולרנס קטן
+      // Enforce per-day distance cap with a small tolerance
       if (dailyRoutes[0].distance > CYCLING_MAX_KM_PER_DAY + 0.1 || dailyRoutes[1].distance > CYCLING_MAX_KM_PER_DAY + 0.1) {
         throw new Error(
           `Cycling day distance exceeded 60 km (day1=${dailyRoutes[0].distance.toFixed(1)}, day2=${dailyRoutes[1].distance.toFixed(1)}).`
@@ -349,9 +349,9 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
         totalDuration: totalSec / 3600
       };
     } else {
-      // הליכה: מסלול מעגלי יחיד בטווח [HIKING_MIN_KM, HIKING_MAX_KM]
+      // Hiking: single circular route within [HIKING_MIN_KM, HIKING_MAX_KM]
 
-      // אם ארוך מדי – ננסה לקצר בדילול נקודות + סגירת לולאה
+      // If too long — try shortening via decimation + loop closure
       if (distanceKm > HIKING_MAX_KM) {
         for (const k of [2, 3]) {
           console.warn(`Hiking ${distanceKm.toFixed(1)} km > ${HIKING_MAX_KM} km, decimate keepEvery=${k}...`);
@@ -363,7 +363,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
         }
       }
 
-      // עדיין ארוך? ננסה לקחת רק prefix יחסי מהנקודות המקוריות
+      // Still too long? Try taking only a prefix of the original snapped points
       if (distanceKm > HIKING_MAX_KM) {
         const fracs = [0.55, 0.45, 0.35];
         for (const frac of fracs) {
@@ -383,7 +383,7 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
         }
       }
 
-      // ניסיון אחרון: לולאה מינימלית לפי רדיוס מטרה תאורטי
+      // Last attempt: minimal loop based on a theoretical target radius
       if (distanceKm > HIKING_MAX_KM) {
         const start = originalSnapped[0];
         const targetRadiusM = (HIKING_MAX_KM * 1000) / (2 * Math.PI) * 0.9; 
@@ -395,12 +395,12 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
         console.warn(`Hiking minimal loop → ${distanceKm.toFixed(1)} km`);
       }
 
-      // בסוף חייב להיות בטווח המוגדר
+      // Must end within the defined range
       if (distanceKm < HIKING_MIN_KM || distanceKm > HIKING_MAX_KM) {
         throw new Error(`Hiking route distance ${distanceKm.toFixed(1)} km out of range (${HIKING_MIN_KM}–${HIKING_MAX_KM} km).`);
       }
 
-      // המרת קואורדינטות לפורמט הלקוח (lat/lng) עם שיוך ליום 1
+      // Convert coordinates to client format (lat/lng) with day 1 assignment
       const outPoints = feature.geometry.coordinates.map(([lon, lat], i) => ({
         lat, lng: lon, day: 1, order: i
       }));
@@ -428,20 +428,20 @@ const generateRouteWithOpenRouteService = async (waypoints, tripType) => {
   }
 };
 
-// יצירת נקודות דרך בעזרת Groq (LLM) עם ניסיונות ותיקון JSON אגרסיבי
+// Generate waypoints using Groq (LLM) with retries and aggressive JSON fixing
 const generateRouteWithAI = async (location, tripType, isRetry = false) => {
-  
+  // Use preset waypoints when available for specific locations
   const preset = getPresetWaypointsIfAny(location, tripType);
   if (preset) {
     return preset; 
   }
 
   const maxRetries = 3;
-  const retryDelay = 1000; // אלף מילישניות בין נסיונות
+  const retryDelay = 1000; // milliseconds between attempts
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // הנחיות קשיחות ל־LLM – פורמט JSON בלבד וכללי מוצר
+      // Strict instructions for the LLM — JSON-only format and product constraints
       const commonRules = `
 REQUIREMENTS (critical):
 - Generate 8-15 waypoints (logical stops/turns)
@@ -504,7 +504,7 @@ Example of GOOD waypoints (varied, realistic):
         return null;
       }
 
-      // פרסינג רובסטי: נסיון ישיר, אח"כ חילוץ Regex, ואז "תיקון" טקסטואלי
+      // Robust parsing: direct parse, then regex extraction, then textual "repair"
       let routeData = null;
 
       try {
@@ -547,7 +547,7 @@ Example of GOOD waypoints (varied, realistic):
   return null;
 };
 
-// ולידציה של waypoints: כמות, תחום ערכים, ואי־יישור בקו ישר
+// Waypoints validation: count, value ranges, and ensuring it's not a straight line
 const isWaypointsValid = (waypoints) => {
   if (!waypoints || !Array.isArray(waypoints) || waypoints.length < 3) {
     return false;
@@ -559,7 +559,7 @@ const isWaypointsValid = (waypoints) => {
       typeof wp.lng === 'number' &&
       Math.abs(wp.lat) <= 90 &&
       Math.abs(wp.lng) <= 180 &&
-      !(Math.abs(wp.lat) < 0.5 && Math.abs(wp.lng) < 0.5) // מרחיק את (0,0) וסביבתו
+      !(Math.abs(wp.lat) < 0.5 && Math.abs(wp.lng) < 0.5) // keep away from (0,0) and its vicinity
     );
     return isValid;
   });
@@ -568,7 +568,7 @@ const isWaypointsValid = (waypoints) => {
     return false;
   }
 
-  // בודק שאין "קו ישר" (באמצעות ניתוח זוויות בין מקטעים)
+  // Check it's not a straight line (by analyzing angles between segments)
   const isNotStraight = !isStraightLine(waypoints);
   if (!isNotStraight) {
   }
@@ -576,7 +576,7 @@ const isWaypointsValid = (waypoints) => {
   return isNotStraight;
 };
 
-// זיהוי "קו ישר" ע"י יחס זוויות ~180° לאורך המסלול
+// Detect a "straight line" by the ratio of ~180° angles along the route
 const isStraightLine = (points) => {
   if (points.length < 3) return false;
 
@@ -608,11 +608,10 @@ const isStraightLine = (points) => {
   return totalAngles > 0 && straightAngles / totalAngles > 0.7;
 };
 
-
-
+// Predefined hiking options for Queenstown (various safe, looped variants)
 function getQueenstownHikingRoutes() {
   return [
-    // מסלול 1 — Gardens + Esplanade + Sunshine Bay קצר
+    // Route 1 — Gardens + Esplanade + short Sunshine Bay
     [
       { lat: -45.0343, lng: 168.6576, name: "Start - Queenstown Gardens Entrance" },
       { lat: -45.0318, lng: 168.6621, name: "Marine Parade Boardwalk" },
@@ -623,7 +622,7 @@ function getQueenstownHikingRoutes() {
       { lat: -45.0343, lng: 168.6576, name: "Finish - Queenstown Gardens Entrance" }
     ],
 
-    // מסלול 2 — Gardens + Skyline + Gorge Rd
+    // Route 2 — Gardens + Skyline + Gorge Rd
     [
       { lat: -45.0343, lng: 168.6576, name: "Start - Queenstown Gardens Entrance" },
       { lat: -45.0329, lng: 168.6535, name: "Skyline Gondola Base" },
@@ -633,7 +632,7 @@ function getQueenstownHikingRoutes() {
       { lat: -45.0343, lng: 168.6576, name: "Finish - Queenstown Gardens Entrance" }
     ],
 
-    // מסלול 3 — Gardens + Lake Esplanade + Fernhill Loop
+    // Route 3 — Gardens + Lake Esplanade + Fernhill Loop
     [
       { lat: -45.0343, lng: 168.6576, name: "Start - Queenstown Gardens Entrance" },
       { lat: -45.0339, lng: 168.6472, name: "Lake Esplanade / Brunswick St" },
@@ -690,6 +689,7 @@ function getQueenstownHikingRoutes() {
 
 let lastQueenstownIndex = null;
 
+// Avoid returning the same preset route twice in a row
 function getRandomQueenstownHikingWaypoints() {
   const routes = getQueenstownHikingRoutes();
   let idx;
@@ -700,6 +700,7 @@ function getRandomQueenstownHikingWaypoints() {
   return routes[idx];
 }
 
+// Return preset waypoints for certain labels/trip types when applicable
 function getPresetWaypointsIfAny(locationLabel, tripType) {
   if (!locationLabel || typeof locationLabel !== 'string') return null;
   const isQueenstown = /queenstown/i.test(locationLabel);
@@ -708,8 +709,6 @@ function getPresetWaypointsIfAny(locationLabel, tripType) {
   }
   return null;
 }
-
-
 
 module.exports = {
   planTrip

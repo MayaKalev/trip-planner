@@ -11,15 +11,15 @@ import Profile from './pages/Profile';
 import LoadingSpinner from './components/LoadingSpinner';
 
 /**
- * רכיב ProtectedRoute – מגן על מסלולים (Routes) שדורשים התחברות.
- * אם המשתמש לא מחובר – מפנה אוטומטית לעמוד ההתחברות.
- * אם עדיין טוענים את מצב ההתחברות – מציג אנימציית טעינה.
+ * ProtectedRoute component — protects routes that require authentication.
+ * If the user is not logged in, it automatically redirects to the login page.
+ * If the auth state is still loading, it shows a loading animation.
  */
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
-    return <LoadingSpinner />; // מצב ביניים בזמן בדיקת ההתחברות
+    return <LoadingSpinner />; 
   }
   
   return user ? children : <Navigate to="/login" replace />;
@@ -28,25 +28,24 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   const { loading } = useAuth();
 
-  // טעינת אפליקציה – הצגת ספינר בזמן בדיקת מצב התחברות ראשוני
   if (loading) {
     return <LoadingSpinner />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* תפריט ניווט עליון – מוצג תמיד */}
+      {/* Top navigation bar — always shown */}
       <Navbar />
 
-      {/* התוכן הראשי */}
+      {/* Main content */}
       <main className="container mx-auto px-4 py-8">
         <Routes>
-          {/* דפי גישה חופשית */}
+          {/* Public pages */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* דפים מוגנים – עטופים ב-<ProtectedRoute> */}
+          {/* Protected pages — wrapped in <ProtectedRoute> */}
           <Route 
             path="/plan" 
             element={
@@ -72,7 +71,7 @@ function App() {
             } 
           />
 
-          {/* הפניה אוטומטית לכל נתיב לא קיים */}
+          {/* Automatic redirect for any unknown route */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

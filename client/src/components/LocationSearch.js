@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import axios from 'axios';
 
 /**
- * קומפוננטת חיפוש מיקום – שולחת שאילתה ל־Nominatim API ומחזירה תוצאה למרכיב האב.
- * מקבלת prop: onSelect (פונקציה שמטפלת בבחירת מקום)
+ * Location search component — sends a query to the Nominatim API
+ * and returns the selected result to the parent component.
+ * Props: onSelect (function that handles place selection)
  */
 const LocationSearch = ({ onSelect }) => {
   const [query, setQuery] = useState('');
@@ -11,8 +12,8 @@ const LocationSearch = ({ onSelect }) => {
   const [loading, setLoading] = useState(false);
 
   /**
-   * מבצעת קריאה ל־API של OpenStreetMap לצורך חיפוש מיקום
-   * מוגבלת ל־5 תוצאות, כולל פרטי כתובת
+   * Calls the OpenStreetMap (Nominatim) API to search for a place.
+   * Limited to 5 results and includes address details.
    */
   const searchLocation = async (e) => {
     e.preventDefault();
@@ -32,20 +33,20 @@ const LocationSearch = ({ onSelect }) => {
       });
       setResults(response.data);
     } catch (error) {
+      // Optional: handle or log the error
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * בחירת מיקום מהרשימה:
-   * מפיק את שם העיר והמדינה מתוך הנתונים המחזרים
-   * ומעביר אותם חזרה להורה בצורה אחידה
+   * Selecting a place from the list:
+   * Extracts city and country from the returned data
+   * and passes them back to the parent in a normalized shape.
    */
   const handleSelect = (place) => {
     const { address, lat, lon, display_name } = place;
 
-    // הגדרת שם עיר בצורה בטוחה ממספר שדות
     const city =
       address.city ||
       address.town ||
@@ -56,21 +57,21 @@ const LocationSearch = ({ onSelect }) => {
 
     const country = address.country || 'Unknown';
 
-    // שולח את פרטי המקום לקומפוננטת האב
+    // Send the selected place details to the parent component
     onSelect({
       name: `${city}, ${country}`,
       lat: parseFloat(lat),
       lng: parseFloat(lon),
     });
 
-    // סוגר את רשימת התוצאות ומעדכן את שורת החיפוש
+    
     setQuery(display_name);
     setResults([]);
   };
 
   return (
     <div>
-      {/* טופס החיפוש */}
+      {/* Search form */}
       <form onSubmit={searchLocation} className="flex space-x-2">
         <input
           type="text"
@@ -84,7 +85,7 @@ const LocationSearch = ({ onSelect }) => {
         </button>
       </form>
 
-      {/* תוצאות חיפוש (רשימה נפתחת) */}
+      {/* Search results (dropdown list) */}
       {results.length > 0 && (
         <ul className="border rounded mt-2 max-h-48 overflow-y-auto bg-white shadow-md z-10 relative">
           {results.map((place, index) => (
