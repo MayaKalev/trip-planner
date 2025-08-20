@@ -1,14 +1,18 @@
 import axios from 'axios';
 
+// הגדרת כתובת בסיס ל־API – או מהסביבה, או ברירת מחדל מקומית
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
-// Axios instance
+// יצירת מופע axios עם הגדרות ברירת מחדל
 const api = axios.create({
   baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Token interceptor
+/**
+ * Interceptor לבקשות – מוסיף Token אם קיים ב־localStorage
+ * מאפשר לכל קריאה ל־API להיות מאובטחת בלי הצורך להוסיף Authorization ידנית
+ */
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -18,39 +22,42 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Prevent browser/proxy caching on GETs (avoids 304 without body)
+/**
+ * פונקציה למניעת קאש בדפדפן/פרוקסי בעת שליפת נתונים (GET)
+ * מוסיפה פרמטר ייחודי לפי חותמת זמן – מונע קבלת 304 ללא גוף תגובה
+ */
 function withNoCache(config = {}) {
   const ts = Date.now().toString();
   return {
     ...config,
-    params: { ...(config.params || {}), ts }, // cache-busting query param
+    params: { ...(config.params || {}), ts }, // מוסיפים את פרמטר ה־ts לשורת השאילתה
   };
 }
 
 export const routeService = {
   /**
-   * Get all routes (summaries) for current user
-   * Returns: { routes, pagination }
+   * שליפת כל המסלולים של המשתמש הנוכחי
+   * כולל פרמטרים לסינון
    */
   async getRoutes(params = {}, { noCache = true } = {}) {
     const cfg = noCache ? withNoCache({ params }) : { params };
     const res = await api.get('/routes', cfg);
-    return res.data.data; // { routes, pagination }
+    return res.data.data;
   },
 
   /**
-   * Get single route details
-   * Returns: { route }
+   * שליפת פרטי מסלול בודד לפי מזהה
+   * מחזיר: { route }
    */
   async getRoute(id, { noCache = true } = {}) {
     const cfg = noCache ? withNoCache() : undefined;
     const res = await api.get(`/routes/${id}`, cfg);
-    return res.data.data; // { route }
+    return res.data.data;
   },
 
   /**
-   * Create a new route
-   * Returns: route
+   * יצירת מסלול חדש
+   * מחזיר: route
    */
   async createRoute(routeData) {
     const res = await api.post('/routes', routeData);
@@ -58,8 +65,8 @@ export const routeService = {
   },
 
   /**
-   * Update a route
-   * Returns: route
+   * עדכון מסלול קיים
+   * מחזיר: route
    */
   async updateRoute(id, routeData) {
     const res = await api.put(`/routes/${id}`, routeData);
@@ -67,12 +74,21 @@ export const routeService = {
   },
 
   /**
-   * Delete a route
+   * מחיקת מסלול לפי מזהה
+   * מחזיר: { success, message }
    */
   async deleteRoute(id) {
     const res = await api.delete(`/routes/${id}`);
-    return res.data; // { success, message }
-  }
+    return res.data;
+  },
 
- 
+  /**
+   * שליפת נתוני סטטיסטיקות מצטברות על המסלולים
+   * מחזיר: stats object
+   */
+  async getRouteStats({ noCache = true } = {}) {
+    const cfg = noCache ? withNoCache() : undefined;
+    const res = await api.get('/routes/stats', cfg);
+    return res.data.data.stats;
+  },
 };

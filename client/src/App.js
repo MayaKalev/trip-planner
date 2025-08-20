@@ -7,16 +7,19 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import TripPlanner from './pages/TripPlanner';
 import SavedRoutes from './pages/SavedRoutes';
-import RouteDetail from './pages/RouteDetail';
 import Profile from './pages/Profile';
 import LoadingSpinner from './components/LoadingSpinner';
 
-// Protected Route component
+/**
+ * רכיב ProtectedRoute – מגן על מסלולים (Routes) שדורשים התחברות.
+ * אם המשתמש לא מחובר – מפנה אוטומטית לעמוד ההתחברות.
+ * אם עדיין טוענים את מצב ההתחברות – מציג אנימציית טעינה.
+ */
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner />; // מצב ביניים בזמן בדיקת ההתחברות
   }
   
   return user ? children : <Navigate to="/login" replace />;
@@ -25,18 +28,25 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   const { loading } = useAuth();
 
+  // טעינת אפליקציה – הצגת ספינר בזמן בדיקת מצב התחברות ראשוני
   if (loading) {
     return <LoadingSpinner />;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* תפריט ניווט עליון – מוצג תמיד */}
       <Navbar />
+
+      {/* התוכן הראשי */}
       <main className="container mx-auto px-4 py-8">
         <Routes>
+          {/* דפי גישה חופשית */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+
+          {/* דפים מוגנים – עטופים ב-<ProtectedRoute> */}
           <Route 
             path="/plan" 
             element={
@@ -54,14 +64,6 @@ function App() {
             } 
           />
           <Route 
-            path="/routes/:id" 
-            element={
-              <ProtectedRoute>
-                <RouteDetail />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
             path="/profile" 
             element={
               <ProtectedRoute>
@@ -69,6 +71,8 @@ function App() {
               </ProtectedRoute>
             } 
           />
+
+          {/* הפניה אוטומטית לכל נתיב לא קיים */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -76,4 +80,4 @@ function App() {
   );
 }
 
-export default App; 
+export default App;

@@ -1,76 +1,71 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Middleware to protect routes
+// Protect routes – check login + token
 const protect = async (req, res, next) => {
   let token;
 
-  // Check if token exists in headers
+  // Check for Bearer token
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
-      // Get token from header
+      // Get token
       token = req.headers.authorization.split(' ')[1];
 
       // Verify token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Get user from token
+      // Find user by ID (no password)
       req.user = await User.findById(decoded.id).select('-password');
 
+      // User not found
       if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: 'User not found'
-        });
+        return res.status(401).json({ success: false, message: 'User not found' });
       }
 
+      // Account inactive
       if (!req.user.isActive) {
-        return res.status(401).json({
-          success: false,
-          message: 'User account is deactivated'
-        });
+        return res.status(401).json({ success: false, message: 'Account deactivated' });
       }
 
+      // Continue
       next();
     } catch (error) {
-      console.error('Token verification error:', error);
-      return res.status(401).json({
-        success: false,
-        message: 'Not authorized, token failed'
-      });
+      // Token invalid/expired
+      return res.status(401).json({ success: false, message: 'Token failed' });
     }
   }
 
+  // No token
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Not authorized, no token'
-    });
+    return res.status(401).json({ success: false, message: 'No token' });
   }
 };
 
-// Middleware to generate JWT token
+// Generate JWT for user
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '7d'
   });
 };
 
-// Optional auth middleware (doesn't fail if no token)
+// Optional auth – set user if token valid, else ignore
 const optionalAuth = async (req, res, next) => {
   let token;
 
+  // Check for Bearer token
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      // Set user (no password)
       req.user = await User.findById(decoded.id).select('-password');
     } catch (error) {
-      // Token is invalid, but we don't fail the request
-      console.log('Optional auth: Invalid token');
+      // Ignore errors
     }
   }
 
+  // Always continue
   next();
 };
 
@@ -78,4 +73,4 @@ module.exports = {
   protect,
   generateToken,
   optionalAuth
-}; 
+};

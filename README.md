@@ -1,188 +1,228 @@
-# Personal Trip Planner
+Trip Planner AI - README
 
-A full-stack web application that allows registered users to plan trip routes, save them, view their trip history, and receive relevant information such as weather forecasts.
+**Authors:**  
+- Roni Arviv - 206395642  
+- Maya Kalev - 212212856  
+
+---
+
+## Overview
+Trip Planner AI is an end-to-end project for planning intelligent travel routes using **React** on the client side and **Node.js Express** on the server side.  
+The system generates realistic hiking or cycling routes around a user-selected destination, adjusts them to road and trail networks, displays real-time weather forecasts for the next three days, and allows saving routes to a personal account.
+
+---
 
 ## Features
+- User authentication: registration, login, logout, and profile management with **JWT**.  
+- Hiking route planning: circular, single-day, **5–15 km**.  
+- Cycling route planning: non-circular, two-day, up to **60 km/day**.  
+- Realistic route adjustment with **OpenRouteService**.  
+- Filtering of straight-line routes to avoid unrealistic results.  
+- Real-time **3-day weather forecast** based on starting coordinates.  
+- Destination image from the internet (or default fallback).  
+- CRUD operations for routes: save, view, update, and delete.  
+- Interactive maps with **Leaflet** displaying routes per day with `Polyline`.  
 
-### MVP Features
-- **User Authentication**: Registration, login, logout with JWT tokens
-- **Trip Planning**: Create cycling and hiking routes with interactive maps
-- **Route Management**: Save, view, and manage personal trip routes
-- **Weather Integration**: 3-day weather forecasts for trip locations
-- **Interactive Maps**: Leaflet.js integration for route visualization
-
-### Technical Stack
-- **Frontend**: React.js with HTML5, CSS3, JavaScript (ES6)
-- **Backend**: Node.js + Express.js
-- **Database**: MongoDB (NoSQL)
-- **Authentication**: JWT tokens with password hashing
-- **Maps**: Leaflet.js for interactive mapping
-- **Weather API**: OpenWeatherMap integration
-- **Route Generation**: AI-powered route suggestions
+---
 
 ## Project Structure
 
 ```
-Trip/
-├── client/                 # React frontend
-│   ├── public/
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/         # Page components
-│   │   ├── services/      # API services
-│   │   ├── utils/         # Utility functions
-│   │   └── styles/        # CSS styles
-│   └── package.json
-├── server/                 # Node.js backend
-│   ├── config/            # Configuration files
-│   ├── controllers/       # Route controllers
-│   ├── middleware/        # Custom middleware
-│   ├── models/           # MongoDB models
-│   ├── routes/           # API routes
-│   ├── utils/            # Utility functions
-│   └── package.json
-├── .env.example          # Environment variables template
-└── README.md
+📂 trip-planner1-main/
+│
+├── 📂 client/                # Frontend (React)
+│   ├── 📂 public/             # Static HTML (main index.html)
+│   ├── 📂 src/
+│   │   ├── 📂 components/     # Reusable UI components (Navbar, LocationSearch, WeatherCard, RouteMap, LoadingSpinner)
+│   │   ├── 📂 contexts/       # Global State (AuthContext)
+│   │   ├── 📂 pages/          # App pages (Home, Login, Profile, Register, SavedRoutes, TripPlanner)
+│   │   ├── 📂 services/       # API services (authService, routeService, tripService, weatherService)
+│   │   ├── index.js           # App entry point
+│   │   └── index.css          # Styling (TailwindCSS)
+│   │   └── App.js          # Root component
+│   └── tailwind.config.js     # TailwindCSS configuration
+│
+├── 📂 server/                # Backend (Node.js + Express)
+│   ├── 📂 routes/             # API routes (auth, routes, trip)
+│   ├── 📂 controllers/        # Request handling logic
+│   ├── 📂 models/             # Mongoose models
+│   ├── 📂 middleware/         # JWT auth, error handling, validations
+│   └── server.js              # Server entry point
+│
+├── .gitignore                 # Git ignore rules
+├── README.md                  # Project documentation
+└── setup.ps1                  # Quick setup PowerShell script
 ```
 
-## Prerequisites
+---
 
-- Node.js (v14 or higher)
-- MongoDB (local installation or MongoDB Atlas)
-- npm or yarn package manager
+##  Technologies
 
-## Installation & Setup
+**Frontend:** React, React Router, TailwindCSS, Leaflet, Axios, react-hot-toast  
+**Backend:** Node.js, Express, Mongoose, JWT, express-validator  
+**Database:** MongoDB  
+**Third-Party APIs:**  
+- OpenRouteService → route generation  
+- OpenWeatherMap → weather forecast  
+- Unsplash → destination images  
+- Groq LLM → waypoint generation  
 
-### 1. Clone and Setup
+---
+
+##  Installation & Setup
+
+### Requirements
+- Node.js v18+  
+- npm or yarn  
+- MongoDB (local or cloud)  
+- API keys:  
+  - `OPENROUTESERVICE_API_KEY`  
+  - `WEATHER_API_KEY` (OpenWeatherMap)  
+  - `GROQ_API_KEY`  
+  - `UNSPLASH_ACCESS_KEY` (optional)
+  
+
+---
+
+### Environment Files
+
+Create **two `.env` files**, one for server and one for client.
+
+#### `server/.env`
+```env
+PORT=5001
+NODE_ENV=development
+CLIENT_URL=http://localhost:3000
+
+MONGODB_URI=mongodb://localhost:27017/trip-planner
+
+JWT_SECRET=change_me
+JWT_EXPIRE=7d
+
+OPENROUTESERVICE_API_KEY=your_ors_key
+WEATHER_API_KEY=your_openweather_key
+GROQ_API_KEY=your_groq_key
+UNSPLASH_ACCESS_KEY=your_unsplash_key
+
+
+```
+
+#### `client/.env`
+```env
+REACT_APP_API_URL=http://localhost:5001/api
+```
+
+---
+
+### Quick Setup (Windows PowerShell)
+From the project root:
+```powershell
+.\setup.ps1
+```
+This installs dependencies, checks `.env` files, and prints next steps.  
+⚠️ API keys must still be added manually.
+
+---
+
+### Manual Run
+Open **two terminals**:
+
+**Server**  
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd Trip
-
-# Install backend dependencies
 cd server
 npm install
-
-# Install frontend dependencies
-cd ../client
-npm install
+npm run dev   # or npm start
 ```
 
-### 2. Environment Configuration
+**Client**  
 ```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env file with your configuration
-# Required variables:
-# - MONGODB_URI: Your MongoDB connection string
-# - JWT_SECRET: Secret key for JWT tokens
-# - WEATHER_API_KEY: OpenWeatherMap API key
-# - PORT: Server port (default: 5000)
-```
-
-### 3. Database Setup
-- Set up MongoDB locally or use MongoDB Atlas
-- Update MONGODB_URI in .env file
-- Database and collections will be created automatically
-
-### 4. API Keys Required
-- **OpenWeatherMap API Key**: Get free API key from [OpenWeatherMap](https://openweathermap.org/api)
-- **JWT Secret**: Generate a secure random string for JWT token signing
-
-### 5. Running the Application
-
-#### Development Mode
-```bash
-# Terminal 1: Start backend server
-cd server
-npm run dev
-
-# Terminal 2: Start frontend development server
 cd client
+npm install
 npm start
 ```
 
-#### Production Mode
-```bash
-# Build frontend
-cd client
-npm run build
+Default:  
+- Client → [http://localhost:3000](http://localhost:3000)  
+- Server → [http://localhost:5001](http://localhost:5001)  
 
-# Start production server
-cd ../server
-npm start
-```
+---
 
-## API Endpoints
+## 🔄 Workflow
+
+1. User registers/logs in → server returns JWT → stored in `localStorage`.  
+2. User selects destination via `LocationSearch`.  
+3. Client sends `POST /api/trip/plan` with destination + trip type.  
+4. Server generates **waypoints** with LLM.  
+5. Waypoints sent to **OpenRouteService** → realistic GeoJSON route.  
+6. Server fetches **3-day weather forecast** + image.  
+7. Client displays map, forecast, and image.  
+8. User can save route (stored in DB).  
+
+---
+
+## 🌐 External Integrations
+- **OpenRouteService** → `/v2/directions` (`foot-hiking`, `cycling-regular`)  
+- **OpenWeatherMap** → 3-day forecast  
+- **Unsplash** → destination image search  
+- **Groq LLM** → JSON-only waypoints  
+
+---
+
+## 📡 API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user (protected)
+- `POST /api/auth/register`  
+- `POST /api/auth/login`  
+- `GET /api/auth/me` (JWT required)  
+- `PUT /api/auth/profile` (JWT required)  
+- `PUT /api/auth/password` (JWT required)  
 
-### Routes
-- `GET /api/routes` - Get user's saved routes (protected)
-- `POST /api/routes` - Save new route (protected)
-- `GET /api/routes/:id` - Get specific route (protected)
-- `DELETE /api/routes/:id` - Delete route (protected)
-
-### Weather
-- `GET /api/weather/:location` - Get weather forecast for location
+### Routes (Saved)
+- `GET /api/routes` → user’s routes (with pagination & filtering)  
+- `GET /api/routes/:id` → route details (with geometry/dailyRoutes & center)  
+- `POST /api/routes` → create new route  
+- `PUT /api/routes/:id` → update route (re-normalization if data replaced)  
+- `DELETE /api/routes/:id` → delete route  
 
 ### Trip Planning
-- `POST /api/plan-trip` - Generate trip route with AI
+- `POST /api/trip/plan` (JWT required)  
+  **Request body:**  
+  ```json
+  {
+    "location": { "name": "Berlin Germany", "lat": 52.52, "lng": 13.405 },
+    "tripType": "hiking"
+  }
+  ```
+  **Response:**  
+  ```json
+  {
+    "route": { "geometry": {...}, "dailyRoutes": [...], "totalDistance": 12345, "totalDuration": 3600 },
+    "weather": { "forecast": [ ... ] },
+    "image": { "url": "..." }
+  }
+  ```
 
-## Usage
+### Weather & Image
+- Weather is always real-time, fetched with `getWeatherData(lat, lng)`.  
+- Destination image via: `GET /api/image?location=`.  
 
-### 1. User Registration/Login
-- Navigate to the application
-- Register with email, name, and password
-- Login with credentials
-- JWT token is automatically managed
+---
 
-### 2. Trip Planning
-- Select country/region/city
-- Choose trip type (Hiking or Cycling)
-- View generated route on interactive map
-- See weather forecast for next 3 days
-- Save route with custom name and description
+## Database Models
 
-### 3. Route Management
-- View all saved routes in history
-- Click on route to load on map
-- Delete unwanted routes
-- View route details and weather
+### User
+- `name`, `email` (unique)  
+- `password` (hashed)  
+- `isActive`, `lastLogin`  
+- Methods: `matchPassword`, `getPublicProfile`  
 
-## Security Features
+### Route
+- `user` (ref)  
+- `name`, `description`, `tripType` (hiking/cycling)  
+- `location`: city, country, coordinates  
+- `routeData`: geometry/dailyRoutes, totalDistance, totalDuration  
+- `image`  
+- `tags`, `notes`  
+- Virtuals: readable distance & duration  
 
-- Password hashing with bcrypt
-- JWT token authentication
-- Protected routes and user-specific data
-- Input validation and sanitization
-- CORS configuration
-
-## Known Issues
-
-- Weather API has rate limits (free tier: 60 calls/minute)
-- Route generation depends on external AI service availability
-- Map tiles may have loading delays in some regions
-
-## Development Notes
-
-- All API calls use fetch with proper error handling
-- React components are functional with hooks
-- MongoDB schemas include proper validation
-- Code includes comprehensive error handling
-- Responsive design for mobile and desktop
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Make changes with proper testing
-4. Submit pull request
-
-## License
-
-This project is created for educational purposes as part of a full-stack development course. 
+---

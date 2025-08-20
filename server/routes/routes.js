@@ -6,15 +6,16 @@ const {
   getRoute,
   createRoute,
   updateRoute,
-  deleteRoute
+  deleteRoute,
+  getRouteStats
 } = require('../controllers/routeController');
 
 const router = express.Router();
 
-// Apply authentication to all routes
+// All routes require auth (JWT)
 router.use(protect);
 
-// Validation middleware
+// Validation: create route
 const createRouteValidation = [
   body('name')
     .trim()
@@ -27,7 +28,7 @@ const createRouteValidation = [
     .withMessage('Description cannot exceed 500 characters'),
   body('tripType')
     .isIn(['hiking', 'cycling'])
-    .withMessage('Trip type must be either hiking or cycling'),
+    .withMessage('Trip type must be hiking or cycling'),
   body('location.country')
     .trim()
     .notEmpty()
@@ -44,10 +45,10 @@ const createRouteValidation = [
     .withMessage('Longitude must be between -180 and 180'),
   body('routeData.totalDistance')
     .isFloat({ min: 0 })
-    .withMessage('Total distance must be a positive number'),
+    .withMessage('Distance must be positive'),
   body('routeData.totalDuration')
     .isFloat({ min: 0 })
-    .withMessage('Total duration must be a positive number'),
+    .withMessage('Duration must be positive'),
   body('tags')
     .optional()
     .isArray()
@@ -56,14 +57,15 @@ const createRouteValidation = [
     .optional()
     .trim()
     .isLength({ max: 50 })
-    .withMessage('Each tag must be less than 50 characters'),
+    .withMessage('Each tag < 50 chars'),
   body('notes')
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Notes cannot exceed 1000 characters')
+    .withMessage('Notes < 1000 chars')
 ];
 
+// Validation: update route
 const updateRouteValidation = [
   body('name')
     .optional()
@@ -78,7 +80,7 @@ const updateRouteValidation = [
   body('tripType')
     .optional()
     .isIn(['hiking', 'cycling'])
-    .withMessage('Trip type must be either hiking or cycling'),
+    .withMessage('Trip type must be hiking or cycling'),
   body('tags')
     .optional()
     .isArray()
@@ -87,19 +89,24 @@ const updateRouteValidation = [
     .optional()
     .trim()
     .isLength({ max: 50 })
-    .withMessage('Each tag must be less than 50 characters'),
+    .withMessage('Each tag < 50 chars'),
   body('notes')
     .optional()
     .trim()
     .isLength({ max: 1000 })
-    .withMessage('Notes cannot exceed 1000 characters')
+    .withMessage('Notes < 1000 chars')
 ];
 
 // Routes
+// GET /api/routes       – all routes
+// GET /api/routes/:id   – single route
+// POST /api/routes      – create
+// PUT /api/routes/:id   – update
+// DELETE /api/routes/:id – delete
 router.get('/', getRoutes);
 router.get('/:id', getRoute);
 router.post('/', createRouteValidation, createRoute);
 router.put('/:id', updateRouteValidation, updateRoute);
 router.delete('/:id', deleteRoute);
 
-module.exports = router; 
+module.exports = router;

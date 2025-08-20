@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Fix for default markers in Leaflet
+// תיקון בעיית הצגת אייקוני ברירת מחדל ב-Leaflet בדפדפנים – טוען ישירות מ-CDN
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
@@ -10,7 +10,11 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const COLORS = ['#3B82F6', '#EF4444', '#10B981', '#F59E0B'];
+/**
+ * צבעים ייחודיים לשני ימים בלבד (יום 1 – כחול, יום 2 – אדום)
+ * בהתאם לדרישה שלא להציג יותר משני ימים במפה.
+ */
+const COLORS = ['#3B82F6', '#EF4444'];
 
 const RouteMap = ({
   routeData,
@@ -20,26 +24,26 @@ const RouteMap = ({
   showMarkers = true,
   showRoute = true
 }) => {
-  const containerRef = useRef(null);
-  const mapRef = useRef(null);
-  const overlayRef = useRef(null);
+  const containerRef = useRef(null); // רפרנס לאלמנט ה־DOM של המפה
+  const mapRef = useRef(null);       // שמירת מופע המפה ל־Leaflet
+  const overlayRef = useRef(null);   // שכבת שכבות (markers, polylines)
 
-  // ערכים פשוטים עבור תלויות
+  // חילוץ קואורדינטות המרכז רק אם center הוא מערך תקין
   const centerLat = Array.isArray(center) ? center[0] : undefined;
   const centerLng = Array.isArray(center) ? center[1] : undefined;
 
-  // 1) אתחול מפה פעם אחת בלבד — בלי שימוש ב־props
+  // אתחול המפה – קורה רק פעם אחת עם טעינת הקומפוננטה
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const container = containerRef.current;
-    const map = L.map(container, {
-      center: [0, 0], // יסתנכרן מיד אח"כ ב־effect נפרד
+    const map = L.map(containerRef.current, {
+      center: [0, 0], // התחלה ב־zoom מינימלי, נשנה אחר כך
       zoom: 1,
       zoomControl: true,
       scrollWheelZoom: true,
     });
 
+    // טעינת אריחי המפה מ־OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 18
@@ -47,37 +51,37 @@ const RouteMap = ({
 
     mapRef.current = map;
 
-    // invalidateSize אחרי שה-DOM מתייצב
+    // תיקון באג ידוע של Leaflet שמצריך invalidateSize אחרי רינדור
     setTimeout(() => map.invalidateSize(), 0);
 
-    // עדכון גודל אוטומטי כשקונטיינר משתנה
+    // האזנה לשינוי גודל הקונטיינר כדי להתאים את המפה אוטומטית
     const ro = new ResizeObserver(() => {
       if (mapRef.current) mapRef.current.invalidateSize();
     });
-    ro.observe(container);
+    ro.observe(containerRef.current);
 
+    // ניקוי משאבים בעת פירוק הקומפוננטה
     return () => {
       ro.disconnect();
-      if (!mapRef.current) return;
-      mapRef.current.eachLayer(l => mapRef.current.removeLayer(l));
-      mapRef.current.remove();
-      mapRef.current = null;
+      if (mapRef.current) {
+        mapRef.current.eachLayer(l => mapRef.current.removeLayer(l));
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
-  }, []); // ⬅️ נקי מתלויות — אין שימוש ב־props כאן
+  }, []);
 
-  // 1.א) סנכרון גובה הקונטיינר עם prop height
+  // שינוי גובה המפה בצורה דינמית לפי prop height
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    // אם אין גובה — קובע, ואם יש שינוי — מעדכן
     if (el.style.height !== height) {
       el.style.height = height;
-      // על שינוי גובה כדאי לרענן מפה
       if (mapRef.current) setTimeout(() => mapRef.current.invalidateSize(), 0);
     }
   }, [height]);
 
-  // 2) שינוי center/zoom בלי להרוס מפה (תלויות פשוטות)
+  // עדכון מרכז המפה ו־zoom כש-props משתנים
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -87,19 +91,18 @@ const RouteMap = ({
     }
   }, [centerLat, centerLng, zoom]);
 
-  // 3) ציור/עדכון שכבות בלבד
+  // ציור מסלול ונקודות במפה
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // נקה שכבה קודמת שלנו
+    // הסרת שכבה קודמת במידה וקיימת
     if (overlayRef.current) {
       map.removeLayer(overlayRef.current);
-      overlayRef.current = null;
     }
     overlayRef.current = L.layerGroup().addTo(map);
 
-    // אין נתיב? רק סמן במרכז
+    // במידה ואין routeData, ניתן להציג רק Marker יחיד
     if (!routeData) {
       if (showMarkers && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
         L.marker([centerLat, centerLng]).addTo(overlayRef.current).bindPopup('Location');
@@ -107,18 +110,18 @@ const RouteMap = ({
       return;
     }
 
-    // עזר להסטה קלה של סמן End אם צריך
+    // פונקציה להזחת נקודת סוף המסלול – כדי שהסמן לא יסתיר את קו המסלול
     const nudge = ([lat, lng], eastM = 6, northM = -6) => {
       const mPerDegLat = 111320;
       const mPerDegLng = 111320 * Math.cos((lat * Math.PI) / 180);
       return [lat + northM / mPerDegLat, lng + eastM / mPerDegLng];
     };
 
-    // dailyRoutes קודם
-    if (showRoute && Array.isArray(routeData.dailyRoutes) && routeData.dailyRoutes.length > 0) {
-      let allBounds = null;
+    // ציור מסלולים יומיים – מוגבל ל־2 ימים
+    if (showRoute && Array.isArray(routeData.dailyRoutes)) {
+      let allBounds = null; // ישמש לקביעת תצוגת zoom אוטומטית
 
-      routeData.dailyRoutes.forEach((dayRoute, idx) => {
+      routeData.dailyRoutes.slice(0, 2).forEach((dayRoute, idx) => {
         const dayPoints = (dayRoute.points && dayRoute.points.length)
           ? dayRoute.points
           : (routeData.points || []).filter(p => p.day === dayRoute.day);
@@ -126,87 +129,37 @@ const RouteMap = ({
         if (!dayPoints || dayPoints.length === 0) return;
 
         const latlngs = dayPoints.map(p => [p.lat, p.lng]);
+
+        // יצירת קו המסלול בצבע שונה לכל יום
         const line = L.polyline(latlngs, {
-          color: COLORS[idx % COLORS.length],
+          color: COLORS[idx],
           weight: 4,
           opacity: 0.9
         }).addTo(overlayRef.current);
 
-        const startLabel = `Start ${dayRoute.day ?? (idx + 1)}`;
-        const endLabel   = `End ${dayRoute.day ?? (idx + 1)}`;
-
-        const startMarker = L.marker(latlngs[0], { zIndexOffset: 1000 })
+        // סמן נקודת ההתחלה
+        L.marker(latlngs[0], { zIndexOffset: 1000 })
           .addTo(overlayRef.current)
-          .bindPopup(startLabel);
+          .bindPopup(`Start Day ${dayRoute.day}`);
 
-        if ((dayRoute.day ?? (idx + 1)) === 1) startMarker.openPopup();
-
+        // סמן נקודת הסיום – מוזחת מעט כדי לא לחפוף לקו
         if (latlngs.length > 1) {
           L.marker(nudge(latlngs[latlngs.length - 1]), { zIndexOffset: 900 })
             .addTo(overlayRef.current)
-            .bindPopup(endLabel);
+            .bindPopup(`End Day ${dayRoute.day}`);
         }
 
-        const b = line.getBounds();
-        allBounds = allBounds ? allBounds.extend(b) : b;
+        // עדכון גבולות התצוגה כך שיכללו את כל המסלול
+        const bounds = line.getBounds();
+        allBounds = allBounds ? allBounds.extend(bounds) : bounds;
       });
 
+      // התאמת המפה לכל המסלולים
       if (allBounds) map.fitBounds(allBounds, { padding: [20, 20] });
       return;
     }
 
-    // geometry כקו יחיד
-    if (showRoute && routeData.geometry) {
-      const geoLayer = L.geoJSON(routeData.geometry, { style: { weight: 4, opacity: 0.9 } })
-        .addTo(overlayRef.current);
-
-      if (
-        showMarkers &&
-        routeData.geometry.type === 'LineString' &&
-        Array.isArray(routeData.geometry.coordinates) &&
-        routeData.geometry.coordinates.length
-      ) {
-        const c = routeData.geometry.coordinates;
-        L.marker([c[0][1], c[0][0]]).addTo(overlayRef.current).bindPopup('Start');
-        if (c.length > 1) {
-          L.marker([c[c.length - 1][1], c[c.length - 1][0]])
-            .addTo(overlayRef.current)
-            .bindPopup('End');
-        }
-      }
-
-      map.fitBounds(geoLayer.getBounds(), { padding: [20, 20] });
-      return;
-    }
-
-    // fallback: לפי points
-    if (showRoute && Array.isArray(routeData.points) && routeData.points.length > 0) {
-      const byDay = {};
-      routeData.points.forEach(p => {
-        (byDay[p.day] ||= []).push([p.lat, p.lng]);
-      });
-
-      let allBounds = null;
-
-      Object.keys(byDay).forEach((day, i) => {
-        const line = L.polyline(byDay[day], {
-          color: COLORS[i % COLORS.length], weight: 4, opacity: 0.9
-        }).addTo(overlayRef.current);
-
-        L.marker(byDay[day][0]).addTo(overlayRef.current).bindPopup(`Start ${i + 1}`);
-        if (byDay[day].length > 1) {
-          L.marker(byDay[day][byDay[day].length - 1]).addTo(overlayRef.current).bindPopup(`End ${i + 1}`);
-        }
-
-        const b = line.getBounds();
-        allBounds = allBounds ? allBounds.extend(b) : b;
-      });
-
-      if (allBounds) map.fitBounds(allBounds, { padding: [20, 20] });
-      return;
-    }
-
-    // אם אין מה לצייר – רק סמן במרכז
+    // מצב fallback – מציג רק מיקום אחד
     if (showMarkers && Number.isFinite(centerLat) && Number.isFinite(centerLng)) {
       L.marker([centerLat, centerLng]).addTo(overlayRef.current).bindPopup('Location');
     }

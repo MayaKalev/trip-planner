@@ -1,16 +1,17 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
 const compression = require('compression');
-require('dotenv').config();
+
 
 // Import routes
 const authRoutes = require('./routes/auth');
 const routeRoutes = require('./routes/routes');
+const weatherRoutes = require('./routes/weather');
 const tripRoutes = require('./routes/trip');
-
+const imageRoutes = require('./routes/imageRoute');
 
 
 // Import middleware
@@ -37,25 +38,13 @@ app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Trip Planner API is running',
-    timestamp: new Date().toISOString()
-  });
-});
 
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/routes', routeRoutes);
+app.use('/api/weather', weatherRoutes);
 app.use('/api/trip', tripRoutes);
-
+app.use('/api/image', imageRoutes); 
 
 // Error handling middleware
 app.use(errorHandler);
@@ -75,9 +64,7 @@ const connectDB = async () => {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
-    console.error('Database connection error:', error.message);
     process.exit(1);
   }
 };
@@ -86,15 +73,11 @@ const connectDB = async () => {
 const startServer = async () => {
   await connectDB();
   app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV}`);
-    console.log(`API URL: http://localhost:${PORT}/api`);
   });
 };
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
-  console.log(`Error: ${err.message}`);
   // Close server & exit process
   process.exit(1);
 });

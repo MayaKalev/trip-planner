@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
+/**
+ * קומפוננטת חיפוש מיקום – שולחת שאילתה ל־Nominatim API ומחזירה תוצאה למרכיב האב.
+ * מקבלת prop: onSelect (פונקציה שמטפלת בבחירת מקום)
+ */
 const LocationSearch = ({ onSelect }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // חיפוש מיקום לפי שאילתת המשתמש
+  /**
+   * מבצעת קריאה ל־API של OpenStreetMap לצורך חיפוש מיקום
+   * מוגבלת ל־5 תוצאות, כולל פרטי כתובת
+   */
   const searchLocation = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -25,17 +32,20 @@ const LocationSearch = ({ onSelect }) => {
       });
       setResults(response.data);
     } catch (error) {
-      console.error('Location search error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // הפונקציה שמכינה את האובייקט לבחירה
+  /**
+   * בחירת מיקום מהרשימה:
+   * מפיק את שם העיר והמדינה מתוך הנתונים המחזרים
+   * ומעביר אותם חזרה להורה בצורה אחידה
+   */
   const handleSelect = (place) => {
-    // הפקת city ו-country בצורה בטוחה
     const { address, lat, lon, display_name } = place;
 
+    // הגדרת שם עיר בצורה בטוחה ממספר שדות
     const city =
       address.city ||
       address.town ||
@@ -46,20 +56,21 @@ const LocationSearch = ({ onSelect }) => {
 
     const country = address.country || 'Unknown';
 
-    // החזרת אובייקט מלא ל־TripPlanner
+    // שולח את פרטי המקום לקומפוננטת האב
     onSelect({
       name: `${city}, ${country}`,
       lat: parseFloat(lat),
       lng: parseFloat(lon),
     });
 
-    // עדכון התיבה וסגירת התוצאות
+    // סוגר את רשימת התוצאות ומעדכן את שורת החיפוש
     setQuery(display_name);
     setResults([]);
   };
 
   return (
     <div>
+      {/* טופס החיפוש */}
       <form onSubmit={searchLocation} className="flex space-x-2">
         <input
           type="text"
@@ -73,6 +84,7 @@ const LocationSearch = ({ onSelect }) => {
         </button>
       </form>
 
+      {/* תוצאות חיפוש (רשימה נפתחת) */}
       {results.length > 0 && (
         <ul className="border rounded mt-2 max-h-48 overflow-y-auto bg-white shadow-md z-10 relative">
           {results.map((place, index) => (

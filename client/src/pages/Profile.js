@@ -5,42 +5,53 @@ import { User, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Profile = () => {
+  // שליפת נתוני המשתמש ושתי פעולות מה־AuthContext:
+  // updateProfile – לעדכון שם ואימייל
+  // changePassword – לשינוי סיסמה
   const { user, updateProfile, changePassword } = useAuth();
 
+  // activeTab – קובע איזו לשונית מוצגת: 'profile' או 'password'
   const [activeTab, setActiveTab] = useState('profile');
+  // saving – דגל טעינה עבור כפתורי שמירה/עדכון כדי להציג spinner ולנעול כפתורים
   const [saving, setSaving] = useState(false);
 
-  // נשאר רק שם ואימייל
+  // טופס עדכון פרופיל (שם ואימייל בלבד, החלטה להציג רק נתונים בסיסיים למשתמש)
   const [profileForm, setProfileForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
   });
 
+  // טופס שינוי סיסמה עם שלושת השדות הדרושים
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
 
+  // אם המשתמש עדיין לא נטען – מציגים מסך טעינה עם טקסט מתאים
   if (!user) {
     return <LoadingSpinner text="Loading profile..." />;
   }
 
+  // עדכון ערכי הטופס של הפרופיל לפי שם השדה
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     setProfileForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // עדכון ערכי הטופס של שינוי הסיסמה
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
     setPasswordForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // שליחת טופס עדכון פרופיל לשרת
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const result = await updateProfile(profileForm); // שולחים רק name, email
+      // שולחים רק name ו-email כדי לא לשנות שדות אחרים
+      const result = await updateProfile(profileForm);
       if (result.success) {
         toast.success('Profile updated successfully');
       } else {
@@ -53,13 +64,16 @@ const Profile = () => {
     }
   };
 
+  // שליחת טופס שינוי סיסמה עם ולידציות בסיסיות בצד לקוח
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
 
+    // בדיקת התאמת הסיסמה החדשה לשדה האישור
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error('New passwords do not match');
       return;
     }
+    // דרישה מינימלית לאורך סיסמה
     if (passwordForm.newPassword.length < 6) {
       toast.error('New password must be at least 6 characters');
       return;
@@ -73,6 +87,7 @@ const Profile = () => {
       );
       if (result.success) {
         toast.success('Password changed successfully');
+        // איפוס הטופס לאחר שינוי מוצלח
         setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
         toast.error(result.error || 'Failed to change password');
@@ -86,14 +101,14 @@ const Profile = () => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Header */}
+      {/* כותרת העמוד עם שם ותיאור פעולה */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Profile</h1>
         <p className="text-gray-600">Manage your account settings</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Profile Info */}
+        {/* כרטיס מידע על המשתמש – בצד שמאל במסכים גדולים */}
         <div className="lg:col-span-1">
           <div className="card">
             <div className="card-body text-center">
@@ -109,9 +124,9 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Settings */}
+        {/* אזור ההגדרות – בצד ימין במסכים גדולים */}
         <div className="lg:col-span-2">
-          {/* Tabs */}
+          {/* כפתורי ניווט בין הלשוניות: פרופיל / סיסמה */}
           <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg">
             <button
               onClick={() => setActiveTab('profile')}
@@ -137,7 +152,7 @@ const Profile = () => {
             </button>
           </div>
 
-          {/* Profile Settings */}
+          {/* לשונית עדכון פרופיל */}
           {activeTab === 'profile' && (
             <div className="card">
               <div className="card-header">
@@ -190,7 +205,7 @@ const Profile = () => {
             </div>
           )}
 
-          {/* Password Settings */}
+          {/* לשונית שינוי סיסמה */}
           {activeTab === 'password' && (
             <div className="card">
               <div className="card-header">

@@ -1,8 +1,9 @@
 import axios from 'axios';
 
+// הגדרת כתובת בסיס ל־API – או מהסביבה, או ברירת מחדל מקומית
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
 
-// Create axios instance with default config
+// יצירת מופע axios עם הגדרות בסיסיות (Base URL + סוג תוכן JSON)
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -10,7 +11,10 @@ const api = axios.create({
   },
 });
 
-// Add token to requests if available
+/**
+ * Interceptor לבקשות – מוסיף Token אם קיים ב־localStorage
+ * זה מאפשר לשלוח את ה־JWT בכל בקשה מאובטחת בלי להוסיף ידנית בכל קריאה
+ */
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -24,7 +28,11 @@ api.interceptors.request.use(
   }
 );
 
-// Handle token expiration
+/**
+ * Interceptor לתגובות – בודק אם השרת החזיר 401 (Unauthorized)
+ * במקרה כזה מוחקים את ה־Token ומבצעים הפניה למסך התחברות
+ * מונע מצב של עבודה עם Token שפג תוקף
+ */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -37,7 +45,10 @@ api.interceptors.response.use(
 );
 
 export const authService = {
-  // Register new user
+  /**
+   * רישום משתמש חדש
+   * שולח שם, אימייל וסיסמה ל־API
+   */
   async register(name, email, password) {
     const response = await api.post('/auth/register', {
       name,
@@ -47,7 +58,10 @@ export const authService = {
     return response.data.data;
   },
 
-  // Login user
+  /**
+   * התחברות משתמש
+   * שולח אימייל וסיסמה ל־API ומקבל חזרה Token + פרטי משתמש
+   */
   async login(email, password) {
     const response = await api.post('/auth/login', {
       email,
@@ -56,19 +70,25 @@ export const authService = {
     return response.data.data;
   },
 
-  // Get current user
+  /**
+   * קבלת פרטי המשתמש הנוכחי לפי ה־Token
+   */
   async getCurrentUser() {
     const response = await api.get('/auth/me');
     return response.data.data.user;
   },
 
-  // Update user profile
+  /**
+   * עדכון פרטי פרופיל משתמש
+   */
   async updateProfile(profileData) {
     const response = await api.put('/auth/profile', profileData);
     return response.data.data.user;
   },
 
-  // Change password
+  /**
+   * שינוי סיסמה – דורש סיסמה נוכחית וסיסמה חדשה
+   */
   async changePassword(currentPassword, newPassword) {
     const response = await api.put('/auth/password', {
       currentPassword,
@@ -76,4 +96,4 @@ export const authService = {
     });
     return response.data;
   },
-}; 
+};
